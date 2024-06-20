@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var code_response = null;
 
   var ip = '127.0.0.1';
-  var port = '8000';
+  var port = '8080';
   var url = 'http://' + ip + ':' + port + '/';
 
     function set_value_of_ip_and_port() {
