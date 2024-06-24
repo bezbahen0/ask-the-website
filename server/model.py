@@ -1,12 +1,13 @@
 from llama_cpp import Llama
 
-LLM_PATH = "./orca-2-13b.Q8_0.gguf"
+LLM_PATH = "models/orca-2-13b.Q8_0.gguf"
+LLM_MODEL = "orca-2-13b.Q8_0.gguf"
 INFERENCE_TYPE = "llama.cpp"
 PROMPT_TEMPLATE_END_OF_TURN = """<|im_end|>"""
 PROMPT_TEMPLATE_START_OF_TURN = """<|im_start|>"""
 
 
-SYSTEM_PROMPT = "your task when receiving text is to summarize its contents and produce quality results"
+SYSTEM_PROMPT = "Ваша задача - быть помощником в выполнении любых заданий, которые я могу попросить вас выполнить или поручить."
 
 
 class LlamaCppWrapper:
@@ -35,9 +36,11 @@ class LLMClientAdapter:
         top_k=30,
         top_p=1.0,
         model_path=LLM_PATH,
+        model_name=LLM_MODEL,
         system_prompt=SYSTEM_PROMPT,
     ):
         self.model_path = model_path
+        self.model_name = model_name
         self.temperature = temperature
         self.max_new_tokens = max_new_tokens
         self.top_k = top_k
@@ -71,7 +74,7 @@ class LLMClientAdapter:
         prompt = question
         template = self.build_prompt_by_template(prompt)
         if INFERENCE_TYPE == "llama.cpp":
-            yield from self.llama_cpp_request(template)
+            return self.llama_cpp_request(template)
 
     def llama_cpp_request(self, template):
         generator = self.client.model.create_completion(

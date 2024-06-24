@@ -4,6 +4,8 @@
   "version": "1.0.6",
   "description": "Query a local model from your browser.",
   "permissions": [
+        "scripting",
+        "activeTab"
   ],
   "action": {
     "default_popup": "popup.html",

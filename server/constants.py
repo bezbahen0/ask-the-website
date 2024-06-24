@@ -1,1 +1,1 @@
-LLM_MODEL_PATH = "models/orca-2-7b.Q8_0.gguf"
+LLM_FOLDER_PATH = "models"
