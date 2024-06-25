@@ -50,8 +50,9 @@ async def get_gguf_files():
 
 @app.post("/query")
 async def handle_query(query: dict):
+    print(query["page_content"])
+    print(query)
     response_from_model = llm_model.generate(question=query["query"])
-    print(response_from_model)
     return {"response": response_from_model}
 
 
