@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from server.constants import LLM_FOLDER_PATH
 from server.model import LLMClientAdapter
+from server.page_processor import HTMLProcessor
 
 app = FastAPI()
 
@@ -20,7 +21,8 @@ app.add_middleware(
 )
 
 
-llm_model = LLMClientAdapter(temperature=0.4, max_new_tokens=512)
+llm_model = LLMClientAdapter(temperature=0.4, max_new_tokens=3000)
+content_processor = HTMLProcessor()
 
 
 @app.get("/get_current_model")
@@ -37,9 +39,9 @@ async def load_model(model: dict):
         model_path=os.path.join(LLM_FOLDER_PATH, model["model"]),
         model_name=model["model"],
         temperature=0.4,
-        max_new_tokens=512,
+        max_new_tokens=3000,
     )
-    
+
     return {"status": "Model loaded successfully"}
 
 
@@ -50,9 +52,17 @@ async def get_gguf_files():
 
 @app.post("/query")
 async def handle_query(query: dict):
-    print(query["page_content"])
-    print(query)
-    response_from_model = llm_model.generate(question=query["query"])
+    content = content_processor.to_md(query["page_content"])[:1500]
+        
+    rewrited_question = llm_model.generate(
+        question="Вопрос: " + query["query"] + "\nПерефразированный: ", system_prompt="rewrite"
+    )
+    print(f"rewrited_question: {rewrited_question}")
+    print(f"content: {content}")
+    response_from_model = llm_model.generate(
+        question=rewrited_question, context=content
+    )
+    print(f"response_from_model: {response_from_model}")
     return {"response": response_from_model}
 
 
@@ -69,4 +79,4 @@ if __name__ == "__main__":
     print("API endpoint available.")
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8080)
+    uvicorn.run(app, host="127.0.0.1", port=8080, reload=True)
