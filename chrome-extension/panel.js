@@ -267,38 +267,25 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     })
 
-
-    function injectContentScriptAndGetPageContent(callback) {
-        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    function getPageContent(callback) {
+        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
             if (chrome.runtime.lastError) {
                 console.error("Error querying tabs:", chrome.runtime.lastError);
                 callback("");
                 return;
             }
-
+    
             const tabId = tabs[0].id;
-
-            chrome.scripting.executeScript(
-                {
-                    target: { tabId: tabId },
-                    function: getPageContent,
-                },
-                (injectionResults) => {
-                    if (chrome.runtime.lastError) {
-                        console.error("Script injection failed:", chrome.runtime.lastError);
-                        callback("");
-                        return;
-                    }
-                    const pageContent = injectionResults[0].result;
-                    callback(pageContent);
+    
+            chrome.tabs.sendMessage(tabId, { action: "getPageContent" }, function(response) {
+                if (chrome.runtime.lastError) {
+                    console.error("Error sending message:", chrome.runtime.lastError);
+                    callback("");
+                    return;
                 }
-            );
+                callback(response ? response.content : "");
+            });
         });
-    }
-
-    function getPageContent() {
-        //return document.body.innerText;
-        return document.documentElement.outerHTML;
     }
 
     submitButton.addEventListener('click', function () {
@@ -307,8 +294,8 @@ document.addEventListener('DOMContentLoaded', function () {
         resultDiv.innerHTML += `<div class="user">You: ${your_prompt}</div>`;
         resultDiv.innerHTML += `<div class="loading">"Llama is thinking..."</div>`;
         resultDiv.scrollTop = resultDiv.scrollHeight;
-
-        injectContentScriptAndGetPageContent((pageContent) => {
+    
+        getPageContent((pageContent) => {
             sendRequest(query, pageContent);
         });
     });
@@ -362,4 +349,3 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 });
-

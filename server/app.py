@@ -52,18 +52,19 @@ async def get_gguf_files():
 
 @app.post("/query")
 async def handle_query(query: dict):
-    content = content_processor.to_md(query["page_content"])[:1500]
-        
-    rewrited_question = llm_model.generate(
-        question="Вопрос: " + query["query"] + "\nПерефразированный: ", system_prompt="rewrite"
-    )
-    print(f"rewrited_question: {rewrited_question}")
+    content = content_processor.to_md(query["page_content"])#[:1500]
+    rewrited_question = query["query"]    
+    #rewrited_question = llm_model.generate(
+    #    question="Вопрос: " + query["query"] + "\nПерефразированный: ", system_prompt="rewrite"
+    #)
+    #print(f"rewrited_question: {rewrited_question}")
     print(f"content: {content}")
-    response_from_model = llm_model.generate(
-        question=rewrited_question, context=content
-    )
-    print(f"response_from_model: {response_from_model}")
-    return {"response": response_from_model}
+    #response_from_model = llm_model.generate(
+    #    question=rewrited_question, context=content
+    #)
+    #print(f"response_from_model: {response_from_model}")
+    #return {"response": response_from_model}
+    return {"response": ""}
 
 
 @app.get("/health")

@@ -1,16 +1,13 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100&display=swap");
 
 :root {
-height: 600px;
-width: 300px;
-border: 0;
-margin: 0;
-padding: 0;
-/* background-color: blue; */
-position: relative;
-overflow: hidden;
-font-family: "Poppins", sans-serif;
-color: white;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    font-family: "Poppins", sans-serif;
+    color: white;
+    background-color: rgb(53, 53, 53);
 }
 
 ::-webkit-scrollbar {
@@ -33,8 +30,7 @@ color: white;
 }
 
 body {
-    height: 220px;
-    width: 500px;
+    overflow-y: auto;
     overflow: hidden;
     margin-bottom: 5px;
 }
@@ -76,16 +72,23 @@ h2 {
 }
 
 .code {
-  position: relative;
-  background-color: #000000; /* Light gray background color */
-  padding: 10px; /* Padding for code blocks */
-  border: 1px solid #ccc; /* Border around code blocks */
-  border-radius: 4px; /* Rounded corners for code blocks */
-  font-family: monospace; /* Use a monospace font for code */
-  font-size: 14px; /* Adjust font size as needed */
-  color: #1eff00; /* Text color for code */
-  /* Add any other styling you need */
-  word-wrap: wrap;
+    position: relative;
+    background-color: #000000;
+    /* Light gray background color */
+    padding: 10px;
+    /* Padding for code blocks */
+    border: 1px solid #ccc;
+    /* Border around code blocks */
+    border-radius: 4px;
+    /* Rounded corners for code blocks */
+    font-family: monospace;
+    /* Use a monospace font for code */
+    font-size: 14px;
+    /* Adjust font size as needed */
+    color: #1eff00;
+    /* Text color for code */
+    /* Add any other styling you need */
+    word-wrap: wrap;
 }
 
 .loading {
@@ -101,35 +104,50 @@ h2 {
 
 @keyframes hueshift {
     0% {
-        background-color: hsl(0, 100%, 50%); /* Red */
+        background-color: hsl(0, 100%, 50%);
+        /* Red */
         color: hsl(120, 100%, 50%);
     }
+
     14.29% {
-        background-color: hsl(30, 100%, 50%); /* Orange */
+        background-color: hsl(30, 100%, 50%);
+        /* Orange */
         color: hsl(180, 100%, 50%);
     }
+
     28.57% {
-        background-color: hsl(60, 100%, 50%); /* Yellow */
+        background-color: hsl(60, 100%, 50%);
+        /* Yellow */
         color: hsl(240, 100%, 50%);
     }
+
     42.86% {
-        background-color: hsl(120, 100%, 50%); /* Green */
+        background-color: hsl(120, 100%, 50%);
+        /* Green */
         color: hsl(270, 100%, 50%);
     }
+
     57.14% {
-        background-color: hsl(180, 100%, 50%); /* Cyan */
+        background-color: hsl(180, 100%, 50%);
+        /* Cyan */
         color: hsl(300, 100%, 50%);
     }
+
     71.43% {
-        background-color: hsl(240, 100%, 50%); /* Blue */
+        background-color: hsl(240, 100%, 50%);
+        /* Blue */
         color: hsl(0, 100%, 50%);
     }
+
     85.71% {
-        background-color: hsl(270, 100%, 50%); /* Indigo */
+        background-color: hsl(270, 100%, 50%);
+        /* Indigo */
         color: hsl(30, 100%, 50%);
     }
+
     100% {
-        background-color: hsl(300, 100%, 50%); /* Violet */
+        background-color: hsl(300, 100%, 50%);
+        /* Violet */
         color: hsl(60, 100%, 50%);
     }
 }
@@ -141,7 +159,7 @@ h2 {
 
 .repo-link:hover {
     scale: 1.1;
-    color:hsl(0, 100%, 50%)
+    color: hsl(0, 100%, 50%)
 }
 
 pre {
@@ -164,7 +182,7 @@ pre {
 }
 
 #copyCode:hover {
- scale: 1.1;
+    scale: 1.1;
 }
 
 #submitButton {
@@ -268,13 +286,7 @@ pre {
 }
 
 #chat-wrapper {
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: 300px;
     background-color: rgb(53, 53, 53);
-    resize: both; /* Allow the window to be resized */
 }
 
 #settings-wrapper {
@@ -332,6 +344,7 @@ pre {
     right: 0;
     top: 0;
 }
+
 #creatorButton {
     background-color: yellow;
     border: 1px solid grey;

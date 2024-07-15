@@ -3,22 +3,49 @@
   "name": "Local LLama LLM AI Chat Query Tool",
   "version": "1.1.0",
   "description": "Query a local model from your browser.",
-  "permissions": [
-        "scripting",
-        "activeTab",
-        "tabs"
-  ],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "images/icon16.png",
-      "48": "images/icon48.png",
-      "128": "images/icon128.png"
-    }
-  },
+  //"background": {
+  //  "service_worker": "background.js"
+  //},
   "icons": {
     "16": "images/icon16.png",
     "48": "images/icon48.png",
     "128": "images/icon128.png"
-  }
+  },
+  "default_locale": "en",
+  "action": {
+    "default_title": "Local LLama LLM AI Chat Query Tool"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "MacCtrl+Shift+E"
+      }
+    }
+  },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ]
+    }
+  ],
+  "offline_enabled": true,
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "sidePanel",
+    "scripting",
+    "activeTab",
+    "tabs"
+  ]
 }
