@@ -93,18 +93,22 @@ class LLMClientAdapter:
             prompt = question
         template = self.build_prompt_by_template_mistral(prompt, system_prompt)
         if INFERENCE_TYPE == "llama.cpp":
-            return self.llama_cpp_request(template)
+            if system_prompt == "rewrite":
+                return self.llama_cpp_request(template, stream=False)
+            return self.llama_cpp_request(template, stream=True)
 
-    def llama_cpp_request(self, template):
+    def llama_cpp_request(self, template, stream=False):
         generator = self.client.model.create_completion(
             template,
-            # stream=True,
+            stream=stream,
             max_tokens=self.max_new_tokens,
             temperature=self.temperature,
         )
+        if stream:
+            for token in generator:
+                yield token["choices"][0]["text"]
+
         return generator["choices"][0]["text"]
-        # for token in generator:
-        #    yield token["choices"][0]["text"]
 
     def build_prompt_by_template_mistral(self, prompt, system_prompt):
         system_prompt = (

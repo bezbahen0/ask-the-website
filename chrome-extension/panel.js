@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function sendRequest(query, pageContent) {
         var req_url = 'http://' + ip + ':' + port + '/query';
-
+    
         fetch(req_url, {
             method: 'POST',
             headers: {
@@ -313,39 +313,70 @@ document.addEventListener('DOMContentLoaded', function () {
             body: JSON.stringify({ query: query, page_content: pageContent }),
             mode: 'cors',
         })
-            .then(response => response.json())
-            .then(data => {
-                const loading = document.querySelector('.loading');
-                loading.parentNode.removeChild(loading);
-
-                // resultDiv.textContent = `Response from the local model: ${data.response}`;
-                data.response = data.response.replace(/(?:\r\n|\r|\n)/g, '<br>');
-                // if * or a number follows a period and a space before
-                data.response = data.response.replace(/\. \*/g, '\n');
-                // also handle numbered lists
-                data.response = data.response.replace(/\. \d/g, '\n');
-                // get the code between the 3 backticks
-                code_response = data.response.match(/```(.*?)```/g);
-                // on the the ''' if there is a <br> before the code remove it
-                if (code_response) {
-                    // remove the first <br> if it exists
-                    data.response = data.response.replace(/```<br>/g, '```');
-                    // replace ```python with ```
-                    data.response = data.response.replace(/```python/g, '```');
-                    data.response = data.response.replace(/```(.*?)```/g, '<div class="code"><pre>$1</pre><div id="copyCode">copy</div></div>');
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedResponse = '';
+    
+            return new ReadableStream({
+                start(controller) {
+                    function push() {
+                        reader.read().then(({ done, value }) => {
+                            if (done) {
+                                controller.close();
+                                return;
+                            }
+                            const chunk = decoder.decode(value, { stream: true });
+                            accumulatedResponse += chunk;
+                            updateUI(accumulatedResponse);
+                            controller.enqueue(chunk);
+                            push();
+                        });
+                    }
+                    push();
                 }
-                resultDiv.innerHTML += `<div class="bot">Response: ${data.response}</div>`;
-                // Scroll to the bottom of the div
-                resultDiv.scrollTop = resultDiv.scrollHeight;
-                saveQuestionAndResponse(query, data.response);
-                queryInput.value = '';
-            })
-            .catch(error => {
-                // const loading = document.querySelector('.loading');
-                // loading.parentNode.removeChild(loading);
-
-                resultDiv.innerHTML += `<div class="error">${error}, is the server up?</div>`;
-                // console.error(error);
             });
+        })
+        .then(stream => new Response(stream))
+        .then(response => response.text())
+        .then(finalResponse => {
+            const loading = document.querySelector('.loading');
+            if (loading) {
+                loading.parentNode.removeChild(loading);
+            }
+            saveQuestionAndResponse(query, finalResponse);
+            queryInput.value = '';
+        })
+        .catch(error => {
+            resultDiv.innerHTML += `<div class="error">${error}, is the server up?</div>`;
+        });
+    }
+
+    function updateUI(text) {
+        // Remove any existing bot response
+        const existingBotResponse = resultDiv.querySelector('.bot');
+        if (existingBotResponse) {
+            existingBotResponse.parentNode.removeChild(existingBotResponse);
+        }
+    
+        // Process the text (similar to what you did in the original code)
+        text = text.replace(/(?:\r\n|\r|\n)/g, '<br>');
+        text = text.replace(/\. \*/g, '\n');
+        text = text.replace(/\. \d/g, '\n');
+    
+        const codeResponse = text.match(/```(.*?)```/g);
+        if (codeResponse) {
+            text = text.replace(/```<br>/g, '```');
+            text = text.replace(/```python/g, '```');
+            text = text.replace(/```javascript/g, '```');
+            text = text.replace(/```(.*?)```/g, '<div class="code"><pre>$1</pre><div id="copyCode">copy</div></div>');
+        }
+    
+        // Add the processed text to the UI
+        resultDiv.innerHTML += `<div class="bot">Response: ${text}</div>`;
+        resultDiv.scrollTop = resultDiv.scrollHeight;
     }
 });

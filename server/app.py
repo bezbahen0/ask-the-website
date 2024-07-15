@@ -1,6 +1,7 @@
 import os
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -52,8 +53,8 @@ async def get_gguf_files():
 
 @app.post("/query")
 async def handle_query(query: dict):
-    content = content_processor.to_md(query["page_content"])#[:1500]
-    rewrited_question = query["query"]    
+    content = content_processor.to_md(query["page_content"])[:256]
+    #rewrited_question = query["query"]    
     #rewrited_question = llm_model.generate(
     #    question="Вопрос: " + query["query"] + "\nПерефразированный: ", system_prompt="rewrite"
     #)
@@ -62,9 +63,11 @@ async def handle_query(query: dict):
     #response_from_model = llm_model.generate(
     #    question=rewrited_question, context=content
     #)
+    response_from_model = llm_model.generate(
+        question=query["query"], context=content
+    )
     #print(f"response_from_model: {response_from_model}")
-    #return {"response": response_from_model}
-    return {"response": ""}
+    return StreamingResponse(response_from_model, media_type="text/plain")
 
 
 @app.get("/health")
