@@ -6,7 +6,7 @@ class HTMLProcessor:
     def __init__(self):
         self.html2text = html2text.HTML2Text()
         self.html2text.ignore_images = True
-        self.html2text.ignore_links = True
+        #self.html2text.ignore_links = True
         self.headers_to_split_on = [
             ("#", "Header 1"),
             ("##", "Header 2"),

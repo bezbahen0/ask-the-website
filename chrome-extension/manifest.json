@@ -3,9 +3,6 @@
   "name": "Local LLama LLM AI Chat Query Tool",
   "version": "1.1.0",
   "description": "Query a local model from your browser.",
-  //"background": {
-  //  "service_worker": "background.js"
-  //},
   "icons": {
     "16": "images/icon16.png",
     "48": "images/icon48.png",

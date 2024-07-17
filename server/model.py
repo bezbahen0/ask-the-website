@@ -98,17 +98,17 @@ class LLMClientAdapter:
             return self.llama_cpp_request(template, stream=True)
 
     def llama_cpp_request(self, template, stream=False):
-        generator = self.client.model.create_completion(
+        response_generator = self.client.model.create_completion(
             template,
             stream=stream,
             max_tokens=self.max_new_tokens,
             temperature=self.temperature,
         )
-        if stream:
-            for token in generator:
-                yield token["choices"][0]["text"]
-
-        return generator["choices"][0]["text"]
+        if not stream:
+            return response_generator["choices"][0]["text"]
+            
+        for token in response_generator:
+            yield token["choices"][0]["text"]
 
     def build_prompt_by_template_mistral(self, prompt, system_prompt):
         system_prompt = (

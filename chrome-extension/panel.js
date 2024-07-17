@@ -268,16 +268,16 @@ document.addEventListener('DOMContentLoaded', function () {
     })
 
     function getPageContent(callback) {
-        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             if (chrome.runtime.lastError) {
                 console.error("Error querying tabs:", chrome.runtime.lastError);
                 callback("");
                 return;
             }
-    
+
             const tabId = tabs[0].id;
-    
-            chrome.tabs.sendMessage(tabId, { action: "getPageContent" }, function(response) {
+
+            chrome.tabs.sendMessage(tabId, { action: "getPageContent" }, function (response) {
                 if (chrome.runtime.lastError) {
                     console.error("Error sending message:", chrome.runtime.lastError);
                     callback("");
@@ -294,24 +294,78 @@ document.addEventListener('DOMContentLoaded', function () {
         resultDiv.innerHTML += `<div class="user">You: ${your_prompt}</div>`;
         resultDiv.innerHTML += `<div class="loading">"Llama is thinking..."</div>`;
         resultDiv.scrollTop = resultDiv.scrollHeight;
-    
+
         getPageContent((pageContent) => {
             sendRequest(query, pageContent);
         });
     });
 
 
+    //    function sendRequest(query, pageContent) {
+    //        var req_url = 'http://' + ip + ':' + port + '/query';
+    //
+    //        fetch(req_url, {
+    //            method: 'POST',
+    //            headers: {
+    //                'Content-Type': 'application/json',
+    //                'Access-Control-Allow-Origin': '*',
+    //            },
+    //            body: JSON.stringify({ query: query, page_content: pageContent }),
+    //            mode: 'cors',
+    //        })
+    //        .then(response => {
+    //            if (!response.ok) {
+    //                throw new Error('Network response was not ok');
+    //            }
+    //            const reader = response.body.getReader();
+    //            const decoder = new TextDecoder();
+    //            let accumulatedResponse = '';
+    //    
+    //            return new ReadableStream({
+    //                start(controller) {
+    //                    function push() {
+    //                        reader.read().then(({ done, value }) => {
+    //                            if (done) {
+    //                                controller.close();
+    //                                return;
+    //                            }
+    //                            const chunk = decoder.decode(value, { stream: true });
+    //                            accumulatedResponse += chunk;
+    //                            updateUI(accumulatedResponse);
+    //                            controller.enqueue(chunk);
+    //                            push();
+    //                        });
+    //                    }
+    //                    push();
+    //                }
+    //            });
+    //        })
+    //        .then(stream => new Response(stream))
+    //        .then(response => response.text())
+    //        .then(finalResponse => {
+    //            const loading = document.querySelector('.loading');
+    //            loading.parentNode.removeChild(loading);
+    //            saveQuestionAndResponse(query, finalResponse);
+    //            queryInput.value = '';
+    //        })
+    //        .catch(error => {
+    //            const loading = document.querySelector('.loading');
+    //            loading.parentNode.removeChild(loading);
+    //            resultDiv.innerHTML += `<div class="error">${error}, is the server up?</div>`;
+    //        });
+    //    }
+
     function sendRequest(query, pageContent) {
-        var req_url = 'http://' + ip + ':' + port + '/query';
+        const req_url = 'http://' + ip + ':' + port + '/query';
+        let accumulatedResponse = ''; // Declare accumulatedResponse in the outer scope
+        let isStreamEnded = false; // Flag to track if the stream has ended
     
         fetch(req_url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
             },
-            body: JSON.stringify({ query: query, page_content: pageContent }),
-            mode: 'cors',
+            body: JSON.stringify({ query, page_content: pageContent }),
         })
         .then(response => {
             if (!response.ok) {
@@ -319,7 +373,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let accumulatedResponse = '';
     
             return new ReadableStream({
                 start(controller) {
@@ -327,12 +380,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         reader.read().then(({ done, value }) => {
                             if (done) {
                                 controller.close();
+                                isStreamEnded = true; // Set the flag when the stream ends
                                 return;
                             }
                             const chunk = decoder.decode(value, { stream: true });
-                            accumulatedResponse += chunk;
-                            updateUI(accumulatedResponse);
-                            controller.enqueue(chunk);
+                            accumulatedResponse += chunk; // Append to the outer variable
+                            updateUI(accumulatedResponse, !isStreamEnded); // Pass the streaming state
                             push();
                         });
                     }
@@ -340,33 +393,61 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         })
-        .then(stream => new Response(stream))
-        .then(response => response.text())
-        .then(finalResponse => {
-            const loading = document.querySelector('.loading');
-            if (loading) {
-                loading.parentNode.removeChild(loading);
+        .then(stream => stream.pipeThrough(new TextDecoderStream())) // Decode the stream
+        .then(decoderStream => {
+            const reader = decoderStream.getReader();
+            return new Promise((resolve, reject) => {
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            const loading = document.querySelector('.loading');
+                            if (loading) {
+                                loading.parentNode.removeChild(loading);
+                            }
+                            resolve();
+                            return;
+                        }
+                        accumulatedResponse += value; // Append to the outer variable
+                        updateUI(accumulatedResponse, !isStreamEnded); // Pass the streaming state
+                        read();
+                    });
+                }
+                read();
+            });
+        })
+        .then(() => {
+            // The stream has ended, update the UI with the complete response and finalize
+            if (isStreamEnded) {
+                const finalResponse = resultDiv.querySelector('.bot-stream');
+                if (finalResponse) {
+                    finalResponse.classList.remove('bot-stream');
+                    finalResponse.classList.add('bot');
+                    // Optionally, you can also update the text here if needed
+                    // finalResponse.innerHTML = `Response: ${accumulatedResponse}`;
+                }
+                saveQuestionAndResponse(query, accumulatedResponse);
+                queryInput.value = '';
             }
-            saveQuestionAndResponse(query, finalResponse);
-            queryInput.value = '';
         })
         .catch(error => {
             resultDiv.innerHTML += `<div class="error">${error}, is the server up?</div>`;
         });
     }
 
-    function updateUI(text) {
+    function updateUI(text, incompleted) {
         // Remove any existing bot response
-        const existingBotResponse = resultDiv.querySelector('.bot');
-        if (existingBotResponse) {
-            existingBotResponse.parentNode.removeChild(existingBotResponse);
+        if (incompleted) {
+            const existingBotResponse = resultDiv.querySelector('.bot-stream');
+            if (existingBotResponse) {
+                existingBotResponse.parentNode.removeChild(existingBotResponse);
+            }
         }
-    
+
         // Process the text (similar to what you did in the original code)
         text = text.replace(/(?:\r\n|\r|\n)/g, '<br>');
         text = text.replace(/\. \*/g, '\n');
         text = text.replace(/\. \d/g, '\n');
-    
+
         const codeResponse = text.match(/```(.*?)```/g);
         if (codeResponse) {
             text = text.replace(/```<br>/g, '```');
@@ -374,9 +455,13 @@ document.addEventListener('DOMContentLoaded', function () {
             text = text.replace(/```javascript/g, '```');
             text = text.replace(/```(.*?)```/g, '<div class="code"><pre>$1</pre><div id="copyCode">copy</div></div>');
         }
-    
-        // Add the processed text to the UI
-        resultDiv.innerHTML += `<div class="bot">Response: ${text}</div>`;
+        if (incompleted) {
+            resultDiv.innerHTML += `<div class="bot-stream">Response: ${text}</div>`;    
+        }
+        else {
+            resultDiv.innerHTML += `<div class="bot">Response: ${text}</div>`;    
+        }
+        
         resultDiv.scrollTop = resultDiv.scrollHeight;
     }
 });
