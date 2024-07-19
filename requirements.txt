@@ -1,3 +1,6 @@
 fastapi
 llama-cpp-python
-gunicorn
+uvicorn
+langchain-text-splitters
+langchain_community
+langchain_chroma

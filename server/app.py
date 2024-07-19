@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from server.constants import LLM_FOLDER_PATH
 from server.model import LLMClientAdapter
 from server.page_processor import HTMLProcessor
+from server.vectorizer import Vectorizer
 
 app = FastAPI()
 
@@ -22,7 +23,8 @@ app.add_middleware(
 )
 
 
-llm_model = LLMClientAdapter(temperature=0.4, max_new_tokens=3000)
+llm_model = LLMClientAdapter(temperature=0.2, max_new_tokens=6000)
+vector_processor = Vectorizer()
 content_processor = HTMLProcessor()
 
 
@@ -39,7 +41,7 @@ async def load_model(model: dict):
     llm_model = LLMClientAdapter(
         model_path=os.path.join(LLM_FOLDER_PATH, model["model"]),
         model_name=model["model"],
-        temperature=0.4,
+        temperature=0.2,
         max_new_tokens=3000,
     )
 
@@ -53,20 +55,29 @@ async def get_gguf_files():
 
 @app.post("/query")
 async def handle_query(query: dict):
-    content = content_processor.to_md(query["page_content"])[:256]
-    #rewrited_question = query["query"]    
-    #rewrited_question = llm_model.generate(
-    #    question="Вопрос: " + query["query"] + "\nПерефразированный: ", system_prompt="rewrite"
-    #)
-    #print(f"rewrited_question: {rewrited_question}")
-    print(f"content: {content}")
-    #response_from_model = llm_model.generate(
-    #    question=rewrited_question, context=content
-    #)
+    # content = content_processor.to_md(query["page_content"])
+    content = query["page_content"]
+    page_url = query["page_url"]
+    print(f'page_url: {page_url}')
+    # rewrited_question = query["query"]
+    # rewrited_question = llm_model.generate(
+    #     question="Вопрос: " + query["query"] + "\nПерефразированный: ", system_prompt="rewrite"
+    # )
+    # print(f"rewrited_question: {rewrited_question}")
+    #print(f"content: {content}")
+    # response_from_model = llm_model.generate(
+    #     question=rewrited_question, context=content
+    # )
+    chunks = content_processor.process_page(content, page_url)
+    print(chunks)
+    relevant_chunks = vector_processor.get_relevant_chunks(query["query"], chunks, page_url=page_url)
+    print("*******************************(*******************************")
+    print(relevant_chunks)
+
     response_from_model = llm_model.generate(
-        question=query["query"], context=content
+        question=query["query"], context="\n\n".join(relevant_chunks)
     )
-    #print(f"response_from_model: {response_from_model}")
+    # print(f"response_from_model: {response_from_model}")
     return StreamingResponse(response_from_model, media_type="text/plain")
 
 

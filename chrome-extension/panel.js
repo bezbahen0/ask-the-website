@@ -271,19 +271,21 @@ document.addEventListener('DOMContentLoaded', function () {
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             if (chrome.runtime.lastError) {
                 console.error("Error querying tabs:", chrome.runtime.lastError);
-                callback("");
+                callback({ url: "", content: "" });
                 return;
             }
 
             const tabId = tabs[0].id;
+            const tabUrl = tabs[0].url;
+
 
             chrome.tabs.sendMessage(tabId, { action: "getPageContent" }, function (response) {
                 if (chrome.runtime.lastError) {
                     console.error("Error sending message:", chrome.runtime.lastError);
-                    callback("");
+                    callback({ url: tabUrl, content: "" });
                     return;
                 }
-                callback(response ? response.content : "");
+                callback({ url: tabUrl, content: response ? response.content : "" });
             });
         });
     }
@@ -295,67 +297,13 @@ document.addEventListener('DOMContentLoaded', function () {
         resultDiv.innerHTML += `<div class="loading">"Llama is thinking..."</div>`;
         resultDiv.scrollTop = resultDiv.scrollHeight;
 
-        getPageContent((pageContent) => {
-            sendRequest(query, pageContent);
+        getPageContent((pageData) => {
+            sendRequest(query, pageData.url, pageData.content);
         });
     });
 
 
-    //    function sendRequest(query, pageContent) {
-    //        var req_url = 'http://' + ip + ':' + port + '/query';
-    //
-    //        fetch(req_url, {
-    //            method: 'POST',
-    //            headers: {
-    //                'Content-Type': 'application/json',
-    //                'Access-Control-Allow-Origin': '*',
-    //            },
-    //            body: JSON.stringify({ query: query, page_content: pageContent }),
-    //            mode: 'cors',
-    //        })
-    //        .then(response => {
-    //            if (!response.ok) {
-    //                throw new Error('Network response was not ok');
-    //            }
-    //            const reader = response.body.getReader();
-    //            const decoder = new TextDecoder();
-    //            let accumulatedResponse = '';
-    //    
-    //            return new ReadableStream({
-    //                start(controller) {
-    //                    function push() {
-    //                        reader.read().then(({ done, value }) => {
-    //                            if (done) {
-    //                                controller.close();
-    //                                return;
-    //                            }
-    //                            const chunk = decoder.decode(value, { stream: true });
-    //                            accumulatedResponse += chunk;
-    //                            updateUI(accumulatedResponse);
-    //                            controller.enqueue(chunk);
-    //                            push();
-    //                        });
-    //                    }
-    //                    push();
-    //                }
-    //            });
-    //        })
-    //        .then(stream => new Response(stream))
-    //        .then(response => response.text())
-    //        .then(finalResponse => {
-    //            const loading = document.querySelector('.loading');
-    //            loading.parentNode.removeChild(loading);
-    //            saveQuestionAndResponse(query, finalResponse);
-    //            queryInput.value = '';
-    //        })
-    //        .catch(error => {
-    //            const loading = document.querySelector('.loading');
-    //            loading.parentNode.removeChild(loading);
-    //            resultDiv.innerHTML += `<div class="error">${error}, is the server up?</div>`;
-    //        });
-    //    }
-
-    function sendRequest(query, pageContent) {
+    function sendRequest(query, pageUrl, pageContent) {
         const req_url = 'http://' + ip + ':' + port + '/query';
         let accumulatedResponse = ''; // Declare accumulatedResponse in the outer scope
         let isStreamEnded = false; // Flag to track if the stream has ended
@@ -365,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ query, page_content: pageContent }),
+            body: JSON.stringify({ query, page_url: pageUrl, page_content: pageContent }),
         })
         .then(response => {
             if (!response.ok) {

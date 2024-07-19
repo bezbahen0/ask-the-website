@@ -1,6 +1,6 @@
 from llama_cpp import Llama
 
-LLM_PATH = "models/Mistral-7B-Instruct-v0.3-Q8_0.gguf"
+LLM_PATH = "models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf"
 LLM_MODEL = "Mistral-7B-Instruct-v0.3-Q8_0.gguf"
 INFERENCE_TYPE = "llama.cpp"
 PROMPT_TEMPLATE_END_OF_TURN = """<|im_end|>"""
@@ -16,7 +16,7 @@ If you're running programmatically, using uvicorn.run(...), then use equivalent 
 
 You can also configure Uvicorn using environment variables with the prefix UVICORN_. For example, in case you want to run the app on port 5000, just set the environment variable UVICORN_PORT to 5000.
 
-Ответь на этот вопрос: о чем эта статья?
+Учитывая контекст, ответь на вопрос: о чем эта статья?
 
 Ответ на вопрос: Эта статья рассказывает о настройках Uvicorn - ASGI-сервера для Python. Основные моменты:
 
@@ -88,7 +88,7 @@ class LLMClientAdapter:
 
     def generate(self, question, context=None, system_prompt="answer"):
         if context:
-            prompt = f"Контекст: {context}\n\nОтветь на этот вопрос: {question}\n\nОтвет на вопрос:"
+            prompt = f"Контекст: {context}\n\Учитывая контекст, ответь на вопрос: {question}\n\nОтвет на вопрос:"
         else:
             prompt = question
         template = self.build_prompt_by_template_mistral(prompt, system_prompt)
@@ -106,7 +106,7 @@ class LLMClientAdapter:
         )
         if not stream:
             return response_generator["choices"][0]["text"]
-            
+
         for token in response_generator:
             yield token["choices"][0]["text"]
 
