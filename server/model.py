@@ -1,5 +1,8 @@
 from llama_cpp import Llama
 
+from server.page_processor import get_processor
+from server.vectorizer import Vectorizer
+
 LLM_PATH = "models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf"
 LLM_MODEL = "Mistral-7B-Instruct-v0.3-Q8_0.gguf"
 INFERENCE_TYPE = "llama.cpp"
@@ -27,9 +30,38 @@ You can also configure Uvicorn using environment variables with the prefix UVICO
 Приводится пример использования переменной окружения для изменения порта, на котором запускается приложение.
 Статья в целом посвящена различным методам настройки и конфигурации Uvicorn для разных сценариев использования.
 """
-REWRITE_SYSTEM_PROMPT = "Ты бот, который помогает перефразировать пользовательские вопросы в более полные. Не отвечай на вопрос, а переписывай его. Формат ответа.\n\nВопрос: Суммаризируй\nПерефразированный: Суммаризируй страницу, по данному контексту и выдели ключевые моменты."
+#REWRITE_SYSTEM_PROMPT = """Ты - ассистент по улучшению поисковых запросов. Твоя задача - расширить и уточнить исходный вопрос пользователя, чтобы улучшить семантический поиск. Пожалуйста, выполни следующие шаги:
+
+#1. Перефразируй исходный вопрос, сохраняя его основной смысл.
+#2. Добавь 2-3 связанных ключевых слова или фразы, которые могут помочь в поиске.
+#3. Если в вопросе есть специфические термины, добавь их синонимы или связанные понятия.
+#4. Сформулируй расширенный запрос в виде полного предложения.
+#
+#Не отвечай на вопрос по существу. Твоя цель - создать расширенный поисковый запрос.
+#Формат промпта:
+#
+#Исходный вопрос: Суммаризируй
+#Контекстная информация:
+#- Метаданные: {"title": "Методы .find_all() и .find*() модуля BeautifulSoup4 в Python"}
+#Расширенный запрос: Объясни методы .find_all() и .find*() в BeautifulSoup4 для парсинга HTML и веб-скрапинга с примерами"""
 
 
+REWRITE_SYSTEM_PROMPT = """You are an advanced query expansion system. Your task is to take a user's original query and relevant document metadata, then produce a single, comprehensive expanded query. This expanded query should:
+
+1. Maintain the core intent of the original question
+2. Incorporate key information from the provided metadata
+3. Add relevant domain-specific terminology
+4. Include synonyms or related concepts
+5. Be formulated as a single, detailed question or statement
+
+Remember, the goal is to create one expanded query that will improve semantic search results in a vector database like ChromaDB.
+
+Input:
+Original query: [user's question]
+Document metadata: [title, keywords, or other relevant information]
+
+Output:
+Expanded query: [A single, comprehensive question or statement that incorporates all the above elements]"""
 class LlamaCppWrapper:
     def __init__(
         self, model_path, n_ctx, top_k, top_p, temperature, repeat_penalty, max_tokens
@@ -69,6 +101,48 @@ class LLMClientAdapter:
         self.client = self.get_inference_client(
             temperature, repeat_penalty, top_k, top_p, max_new_tokens
         )
+        self.vector_processor = Vectorizer()
+        self.content_processor = get_processor()
+
+    def question_answer_with_context(self, question, context, url):
+
+        print(f"page_url: {url}")
+        self.content_processor = get_processor(page_type="html")
+        documents, page_meta = self.content_processor.process_page(context, url)
+        print(documents)
+        print(f"Количество чанков ввобще: {len(documents)}")
+        rewrited_question = self.generate(
+            question=question,
+            context=page_meta,
+            system_prompt="rewrite",
+        )
+        print(f"rewrited_question: {rewrited_question}")
+
+        relevant_documents = self.vector_processor.get_relevant_documents(
+            rewrited_question, documents, page_url=url
+        )
+        relevant_chunks = self.content_processor.process_relevant_documents(relevant_documents)
+
+        print(relevant_chunks)
+
+        response_from_model = self.generate(
+            question=question, context="\n\n".join(relevant_chunks)
+        )
+        
+        return response_from_model
+
+    def generate(self, question, context=None, system_prompt="answer"):
+        prompt = self._make_user_query(
+            question=question, context=context, system_prompt=system_prompt
+        )
+
+        template = self._build_prompt_by_template_mistral(prompt, system_prompt)
+        if INFERENCE_TYPE == "llama.cpp":
+            if system_prompt == "rewrite":
+                return self._llama_cpp_request(template, stream=False)
+            elif system_prompt == "answer":
+                return self._llama_cpp_request(template, stream=True)
+            raise ValueError(f"{system_prompt} system_prompt not implemented")
 
     def get_inference_client(
         self, temperature, repeat_penalty, top_k, top_p, max_new_tokens
@@ -86,31 +160,36 @@ class LLMClientAdapter:
         else:
             raise NotImplementedError
 
-    def generate(self, question, context=None, system_prompt="answer"):
-        if context:
-            prompt = f"Контекст: {context}\n\Учитывая контекст, ответь на вопрос: {question}\n\nОтвет на вопрос:"
+    def _make_user_query(self, question, context, system_prompt):
+        if system_prompt == "answer":
+            user_query = f"Контекст: {context}\n\Учитывая контекст, ответь на вопрос: {question}\n\nОтвет на вопрос:"
+        elif system_prompt == "rewrite":
+            #user_query = f"Исходный вопрос: {question}\nКонтекстная информация:\n- Метаданные: {context}\nРасширенный запрос: "
+            user_query = f"Input:\nOriginal query: {question}\nDocument metadata: {context}\n\nOutput:\nExpanded query: " 
         else:
-            prompt = question
-        template = self.build_prompt_by_template_mistral(prompt, system_prompt)
-        if INFERENCE_TYPE == "llama.cpp":
-            if system_prompt == "rewrite":
-                return self.llama_cpp_request(template, stream=False)
-            return self.llama_cpp_request(template, stream=True)
+            user_query = question
+        return user_query
 
-    def llama_cpp_request(self, template, stream=False):
+    def _make_answer_context(sefl, questin, context):
+        pass
+
+    def _llama_cpp_request(self, template, stream=False):
         response_generator = self.client.model.create_completion(
             template,
             stream=stream,
             max_tokens=self.max_new_tokens,
             temperature=self.temperature,
         )
-        if not stream:
-            return response_generator["choices"][0]["text"]
+        if stream:
 
-        for token in response_generator:
-            yield token["choices"][0]["text"]
+            def generate():
+                for token in response_generator:
+                    yield token["choices"][0]["text"]
 
-    def build_prompt_by_template_mistral(self, prompt, system_prompt):
+            return generate()
+        return response_generator["choices"][0]["text"]
+
+    def _build_prompt_by_template_mistral(self, prompt, system_prompt):
         system_prompt = (
             SYSTEM_PROMPT if system_prompt == "answer" else REWRITE_SYSTEM_PROMPT
         )
@@ -123,7 +202,7 @@ class LLMClientAdapter:
         )
         return template
 
-    def build_prompt_by_template_llama3(self, prompt, system_prompt):
+    def _build_prompt_by_template_llama3(self, prompt, system_prompt):
         template = (
             PROMPT_TEMPLATE_START_OF_TURN + "system" + self.system_prompt
             if system_prompt == "answer"
