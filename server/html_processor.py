@@ -1,14 +1,14 @@
 import html2text
 from langchain_core.documents import Document
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 
 class HTMLProcessor:
-    def __init__(self, min_chunk_size=20, chunk_overlap=30, unicode=False):
+    def __init__(self, min_chunk_size=20, max_dom_depth=12, unicode=False):
         self.html2text = html2text.HTML2Text()
         self.html2text.ignore_images = True
         self.min_chunk_size = min_chunk_size
-        self.chunk_overlap = chunk_overlap
+        self.max_dom_depth = max_dom_depth
         self.unicode = unicode
         # self.html2text.wrap_links = True
         # self.html2text.wrap_lists = True
@@ -38,33 +38,44 @@ class HTMLProcessor:
 
     def _process_head(self, html_head):
         content = BeautifulSoup(html_head, "html.parser")
-        page_meta = {"title": content.title, "page_language": content.find("head").get("lang")}
+        page_meta = {
+            "title": content.title,
+            "page_language": content.find("head").get("lang"),
+        }
         return page_meta
 
-    def _get_tag_without_childrens(self, soup_tag):
+    def _get_limited_depth_tag(self, tag, max_depth, current_depth=0):
+        if isinstance(tag, NavigableString):
+            return tag
 
-        # copy tag
-        tag = next(iter(BeautifulSoup(str(soup_tag), "html.parser")))
+        new_tag = Tag(name=tag.name, attrs=tag.attrs)
 
-        for child in tag.findChildren():
-            if child.name:
-                child.replace_with("")
+        if current_depth >= max_depth:
+            # At max depth, only keep direct text content
+            for child in tag.children:
+                if isinstance(child, NavigableString):
+                    new_tag.append(child)
+            return new_tag
 
-        return tag
+        for child in tag.children:
+            new_child = self._get_limited_depth_tag(child, max_depth, current_depth + 1)
+            new_tag.append(new_child)
+
+        return new_tag
 
     def _process_body(self, html_body, page_url):
         content = BeautifulSoup(html_body, "html.parser")
 
         docs = []
         for tag in self.split_by_tags(content):
-            tag_content_without_children = self._get_tag_without_childrens(tag)
-            text_from_tag = self.to_md(
-                str(tag_content_without_children), type_process="just_text"
+            tag_content_without_children = self._get_limited_depth_tag(
+                tag, max_depth=self.max_dom_depth
             )
+            text_from_tag = self.to_md(str(tag_content_without_children))
             if not self.unicode:
                 text_from_tag = text_from_tag.encode("ascii", errors="ignore").decode()
             if self.min_chunk_size > len(text_from_tag):
-                text_from_tag = self._prepare_small_tag(tag, text_from_tag)
+                continue
 
             if text_from_tag and text_from_tag != "\n\n":
 
@@ -77,9 +88,8 @@ class HTMLProcessor:
                     },
                 )
                 docs.append(document)
-        
-        sorted_docs = self._remove_subset_documents(docs)
-        return sorted_docs
+
+        return docs
 
     def split_by_tags(self, html_soup):
         results = []
@@ -87,65 +97,13 @@ class HTMLProcessor:
             if tag.find(text=True, recursive=False):
                 yield tag
 
-    def _get_parent_text(self, tag):
-        current = tag
-        while current.parent:
-            current = current.parent
-            parent_text = self.to_md(str(current.parent), type_process="just_text")
-            if parent_text:
-                #print(parent_text)
-                return parent_text
-        return ""
-
-    def _prepare_small_tag(self, tag, text):
-        if text == "\n\n":
-            return text
-
-        # If tag is too small but has children with text, concatenate text with children's text
-        if len(text) < self.min_chunk_size:
-            children_text = self.to_md(str(tag), type_process="just_text").strip()
-            if children_text:
-                text = f"{text} {children_text[: self.chunk_overlap]}".strip()
-
-        # If tag is still too small, doesn't have children with text, but has a parent with text,
-        # concatenate parent's text with the current text
-        if len(text) < self.min_chunk_size:
-            parent_text = self._get_parent_text(tag)
-            if parent_text and parent_text != text:
-                parent_text = parent_text[-self.chunk_overlap:]
-                
-
-        if len(text) >= self.min_chunk_size:
-            # If we've added text, make sure to include the original text fully
-            return text
-
-        return ""
-
-
-    def _remove_subset_documents(self, docs):
-        # Сначала сортируем документы по длине содержания (от самого длинного к самому короткому)
-        sorted_docs = sorted(docs, key=lambda x: len(x.page_content), reverse=True)
-
-        documents_to_keep = []
-
-        for i, doc in enumerate(sorted_docs):
-            is_subset = False
-            for longer_doc in sorted_docs[:i]:  # Проверяем только более длинные документы
-                if doc.page_content in longer_doc.page_content:
-                    is_subset = True
-                    break
-            if not is_subset:
-                documents_to_keep.append(doc)
-
-        return documents_to_keep
-
     def _sort_documents_by_tag_id(self, initial_order, docs_to_sort):
 
         # Define a custom key function for sorting
         def sort_key(doc):
-            tag_id = doc.metadata['tag_id']
+            tag_id = doc.metadata["tag_id"]
             # Return the position of the tag_id in the initial list, or a large number if not found
-            return initial_order.get(tag_id, float('inf'))
+            return initial_order.get(tag_id, float("inf"))
 
         # Sort the documents using the custom key function
         sorted_docs = sorted(docs_to_sort, key=sort_key)
@@ -173,16 +131,8 @@ class HTMLProcessor:
 
         # Recovery documents order by html page
         ids_to_sort = {tag.get("id"): i for i, tag in enumerate(body_soup.findAll())}
-        relevant_documents = self._sort_documents_by_tag_id(ids_to_sort, relevant_documents)
+        relevant_documents = self._sort_documents_by_tag_id(
+            ids_to_sort, relevant_documents
+        )
 
-        for docs in relevant_documents:
-            completed_docs = self.to_md(
-                str(
-                    body_soup.find(
-                        docs.metadata["tag"], attrs={"id": docs.metadata["tag_id"]}
-                    )
-                ),
-                type_process="simple",
-            )
-            results.append(completed_docs)
-        return results
+        return relevant_documents

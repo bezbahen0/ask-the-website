@@ -16,15 +16,11 @@ class Vectorizer:
         retriever = db.as_retriever(
             search_type="similarity_score_threshold",
             search_kwargs={
-                "score_threshold": 0.15,
+                "score_threshold": 0.4,
                 "filter": {"source": page_url},
                 "k": len(documents),
             },
         )
         docs = retriever.get_relevant_documents(query)
-        print(f"Надено чанков: {len(docs)}")
-        # docs = db.similarity_search_with_relevance_scores(
-        #    query, filter={"source": page_url}
-        # )
 
         return docs

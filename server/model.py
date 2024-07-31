@@ -121,9 +121,9 @@ class LLMClientAdapter:
         relevant_documents = self.vector_processor.get_relevant_documents(
             rewrited_question, documents, page_url=url
         )
-        relevant_chunks = self.content_processor.process_relevant_documents(relevant_documents)
-
-        print(relevant_chunks)
+        relevant_documents = self.content_processor.process_relevant_documents(relevant_documents)
+        print(relevant_documents)
+        relevant_chunks = [doc.page_content for doc in relevant_documents]
 
         response_from_model = self.generate(
             question=question, context="\n\n".join(relevant_chunks)
