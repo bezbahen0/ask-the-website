@@ -62,6 +62,8 @@ Document metadata: [title, keywords, or other relevant information]
 
 Output:
 Expanded query: [A single, comprehensive question or statement that incorporates all the above elements]"""
+
+
 class LlamaCppWrapper:
     def __init__(
         self, model_path, n_ctx, top_k, top_p, temperature, repeat_penalty, max_tokens
@@ -78,12 +80,16 @@ class LlamaCppWrapper:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
+    def tokenize(self, text):
+        return self.model.tokenize(text.encode('utf8'))
+
 
 class LLMClientAdapter:
     def __init__(
         self,
         temperature,
         max_new_tokens,
+        max_context_size=10000,
         repeat_penalty=1.1,
         top_k=30,
         top_p=1.0,
@@ -95,11 +101,12 @@ class LLMClientAdapter:
         self.model_name = model_name
         self.temperature = temperature
         self.max_new_tokens = max_new_tokens
+        self.max_context_size = max_context_size
         self.top_k = top_k
         self.top_p = top_p
         self.system_prompt = system_prompt
         self.client = self.get_inference_client(
-            temperature, repeat_penalty, top_k, top_p, max_new_tokens
+            temperature, repeat_penalty, top_k, top_p, max_new_tokens, max_context_size
         )
         self.vector_processor = Vectorizer()
         self.content_processor = get_processor()
@@ -108,28 +115,39 @@ class LLMClientAdapter:
 
         print(f"page_url: {url}")
         self.content_processor = get_processor(page_type="html")
-        documents, page_meta = self.content_processor.process_page(context, url)
-        print(documents)
-        print(f"Количество чанков ввобще: {len(documents)}")
-        rewrited_question = self.generate(
-            question=question,
-            context=page_meta,
-            system_prompt="rewrite",
-        )
-        print(f"rewrited_question: {rewrited_question}")
+        documents, page_meta = self.content_processor.process_page(context, url, split_to_chunks=False)
+        print(page_meta)
+        
+        if not self.check_context_len(text="\n".join(documents)):
+            documents, page_meta = self.content_processor.process_page(context, url, split_to_chunks=True)
+            print(f"Количество чанков ввобще: {len(documents)}")
+            rewrited_question = self.generate(
+                question=question,
+                context=page_meta,
+                system_prompt="rewrite",
+            )
+            print(f"rewrited_question: {rewrited_question}")
 
-        relevant_documents = self.vector_processor.get_relevant_documents(
-            rewrited_question, documents, page_url=url
-        )
-        relevant_documents = self.content_processor.process_relevant_documents(relevant_documents)
-        print(relevant_documents)
-        relevant_chunks = [doc.page_content for doc in relevant_documents]
+            relevant_documents = self.vector_processor.get_relevant_documents(
+                rewrited_question, documents, page_url=url
+            )
+            relevant_chunks = [doc.page_content for doc in relevant_documents]
+        else:
+            relevant_chunks = documents
 
+        print(relevant_chunks)
         response_from_model = self.generate(
             question=question, context="\n\n".join(relevant_chunks)
         )
         
         return response_from_model
+    
+    def check_context_len(self, text):
+        context_len = len(self.client.tokenize(text))
+        print(context_len)
+        if context_len > self.max_context_size:
+            return False
+        return True
 
     def generate(self, question, context=None, system_prompt="answer"):
         prompt = self._make_user_query(
@@ -145,15 +163,15 @@ class LLMClientAdapter:
             raise ValueError(f"{system_prompt} system_prompt not implemented")
 
     def get_inference_client(
-        self, temperature, repeat_penalty, top_k, top_p, max_new_tokens
+        self, temperature, repeat_penalty, top_k, top_p, max_new_tokens, max_context_size
     ):
         if INFERENCE_TYPE == "llama.cpp":
             return LlamaCppWrapper(
                 model_path=self.model_path,
                 temperature=temperature,
                 repeat_penalty=repeat_penalty,
-                max_tokens=max_new_tokens,
-                n_ctx=max_new_tokens,
+                max_tokens=max_new_tokens + max_context_size,
+                n_ctx=max_context_size,
                 top_k=top_k,
                 top_p=top_p,
             )
@@ -194,7 +212,7 @@ class LLMClientAdapter:
             SYSTEM_PROMPT if system_prompt == "answer" else REWRITE_SYSTEM_PROMPT
         )
         template = (
-            "<s>[INST] <<SYS>>\n"
+            "[INST] <<SYS>>\n"
             + system_prompt
             + "\n<</SYS>>\n\n"
             + prompt

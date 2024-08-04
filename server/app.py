@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 
-llm_model = LLMClientAdapter(temperature=0.2, max_new_tokens=15000)
+llm_model = LLMClientAdapter(temperature=0.2, max_new_tokens=2048)
 
 
 @app.get("/get_current_model")
@@ -38,7 +38,7 @@ async def load_model(model: dict):
         model_path=os.path.join(LLM_FOLDER_PATH, model["model"]),
         model_name=model["model"],
         temperature=0.2,
-        max_new_tokens=15000,
+        max_new_tokens=2048,
     )
 
     return {"status": "Model loaded successfully"}

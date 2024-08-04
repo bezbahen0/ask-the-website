@@ -1,19 +1,26 @@
 import html2text
 from langchain_core.documents import Document
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, NavigableString, Tag, Comment
+
+from langchain_text_splitters import (
+    Language,
+    RecursiveCharacterTextSplitter,
+)
 
 
 class HTMLProcessor:
-    def __init__(self, min_chunk_size=20, max_dom_depth=12, unicode=False):
+    def __init__(self, chunk_size=256, chunk_overlap=40, unicode=False):
         self.html2text = html2text.HTML2Text()
         self.html2text.ignore_images = True
-        self.min_chunk_size = min_chunk_size
-        self.max_dom_depth = max_dom_depth
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
         self.unicode = unicode
-        # self.html2text.wrap_links = True
-        # self.html2text.wrap_lists = True
-        # self.html2text.inline_links = False
-        # self.html2text.ignore_links = True
+
+        self.splitter = RecursiveCharacterTextSplitter.from_language(
+            language=Language.MARKDOWN,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
 
     def assign_ids(self, html_content):
         soup = BeautifulSoup(html_content, "html.parser")
@@ -40,77 +47,100 @@ class HTMLProcessor:
         content = BeautifulSoup(html_head, "html.parser")
         page_meta = {
             "title": content.title,
-            "page_language": content.find("head").get("lang"),
         }
         return page_meta
 
-    def _get_limited_depth_tag(self, tag, max_depth, current_depth=0):
-        if isinstance(tag, NavigableString):
-            return tag
+    def _process_body(self, html_body, page_url, split=True):
+        main_content, navigation_content = self._split_html_content(html_body)
+        page_meta = self._get_html_content_meta(main_content)
+        main_md_content = self.to_md(str(main_content))
+        if split:
+            docs = self.splitter.create_documents([main_md_content], [{"source": page_url}])
+            return docs, page_meta, str(navigation_content)
 
-        new_tag = Tag(name=tag.name, attrs=tag.attrs)
+        return [main_md_content], page_meta, str(navigation_content)
 
-        if current_depth >= max_depth:
-            # At max depth, only keep direct text content
-            for child in tag.children:
-                if isinstance(child, NavigableString):
-                    new_tag.append(child)
-            return new_tag
+    def _get_html_content_meta(self, html_soup):
+        mark_tags = [
+            "b",
+            "strong",
+            "i",
+            "em",
+            "mark",
+            "small",
+            "del",
+            "ins",
+            "sub",
+            "sup",
+        ]
 
-        for child in tag.children:
-            new_child = self._get_limited_depth_tag(child, max_depth, current_depth + 1)
-            new_tag.append(new_child)
+        results = {}
+        for tag in mark_tags:
+            for soup_tag in html_soup.find_all(tag):
+                if tag in results:
+                    results[tag].append(self.to_md(str(soup_tag), type_process="just_text"))
+                else:
+                    results[tag] = [self.to_md(str(soup_tag), type_process="just_text")]
 
-        return new_tag
+        page_meta = {"marked_page_tags_or_keywords": results}
 
-    def _process_body(self, html_body, page_url):
-        content = BeautifulSoup(html_body, "html.parser")
+        return page_meta
 
-        docs = []
-        for tag in self.split_by_tags(content):
-            tag_content_without_children = self._get_limited_depth_tag(
-                tag, max_depth=self.max_dom_depth
-            )
-            text_from_tag = self.to_md(str(tag_content_without_children))
-            if not self.unicode:
-                text_from_tag = text_from_tag.encode("ascii", errors="ignore").decode()
-            if self.min_chunk_size > len(text_from_tag):
-                continue
+    def _split_html_content(self, html):
+        soup = BeautifulSoup(html, "html.parser")
 
-            if text_from_tag and text_from_tag != "\n\n":
+        main_content = BeautifulSoup('<div id="main_content"></div>', "html.parser")
+        navigation_content = BeautifulSoup(
+            '<div id="navigation_content"></div>', "html.parser"
+        )
 
-                document = Document(
-                    page_content=text_from_tag.strip(),
-                    metadata={
-                        "source": page_url,
-                        "tag_id": tag.get("id"),
-                        "tag": tag.name,
-                    },
-                )
-                docs.append(document)
+        main_content_div = main_content.div
+        navigation_content_div = navigation_content.div
 
-        return docs
+        def is_navigation_element(tag):
+            navigation_classes = ["menu", "navbar", "navigation", "sidebar", "nav"]
+            navigation_tags = ["nav", "header", "footer"]
 
-    def split_by_tags(self, html_soup):
-        results = []
-        for tag in html_soup.find_all(True):
-            if tag.find(text=True, recursive=False):
-                yield tag
+            if tag.name in navigation_tags:
+                return True
+            if "class" in tag.attrs:
+                if any(
+                    nav_class in tag.get("class", [])
+                    for nav_class in navigation_classes
+                ):
+                    return True
+            return False
+
+        def process_element(element, parent):
+            # Iterate over a copy of the children to avoid modifying the list while iterating
+            for child in element.contents[:]:
+                if isinstance(child, Comment):
+                    continue  # Skip comments
+                if isinstance(child, str):
+                    continue  # Skip text nodes
+                if is_navigation_element(child):
+                    navigation_content_div.append(child.extract())
+                else:
+                    # Recursively process non-navigation elements
+                    process_element(child, child)
+
+        # Start processing the body of the HTML document
+        body = soup.body
+        if body:
+            process_element(body, main_content_div)
+            main_content_div.append(body)
+
+        return main_content, navigation_content
 
     def _sort_documents_by_tag_id(self, initial_order, docs_to_sort):
-
-        # Define a custom key function for sorting
         def sort_key(doc):
             tag_id = doc.metadata["tag_id"]
-            # Return the position of the tag_id in the initial list, or a large number if not found
             return initial_order.get(tag_id, float("inf"))
 
-        # Sort the documents using the custom key function
         sorted_docs = sorted(docs_to_sort, key=sort_key)
-
         return sorted_docs
 
-    def process_page(self, html_content, page_url):
+    def process_page(self, html_content, page_url, split_to_chunks=True):
         content = BeautifulSoup(html_content, "html.parser")
         self.body = content.find("body")
 
@@ -118,11 +148,15 @@ class HTMLProcessor:
 
         page_meta = self._process_head(str(head))
         page_meta["url"] = page_url
+        page_meta["language"] = content.html["lang"]
 
         html_content_added_ids = self.assign_ids(str(self.body))
         self.body = html_content_added_ids
 
-        documents = self._process_body(html_content_added_ids, page_url)
+        documents, body_page_meta, navigation_content = self._process_body(
+            html_content_added_ids, page_url, split=split_to_chunks
+        )
+        page_meta.update(body_page_meta)
         return documents, page_meta
 
     def process_relevant_documents(self, relevant_documents):
