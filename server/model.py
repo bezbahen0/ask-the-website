@@ -126,9 +126,17 @@ class LLMClientAdapter:
             relevant_chunks = []
             for doc in tqdm(documents):
                 if self.check_context_len(doc):
+                    if page_meta:
+                        context = (
+                            f"Это кусок документа:\n url: {url} \n document meta: {page_meta}"
+                            + doc
+                        )
+                    else:
+                        context = f"Это кусок документа:\n url: {url} \n" + doc
+
                     response = self.generate(
                         question=question,
-                        context=f"Это кусок документа:\n url: {url} \n" + doc,
+                        context=context,
                         system_prompt=SYSTEM_PROMPT,
                         stream=False,
                     )
@@ -147,14 +155,19 @@ class LLMClientAdapter:
                     ]
                 ),
                 system_prompt=AGGREGATE_SYSTEM_PROMPT,
-                stream=True
+                stream=True,
             )
         else:
             print("GOODE")
             relevant_chunks = documents
+            if page_meta:
+                context = f"document meta: {page_meta} url: {url} \n {'Это целый документ'.join(documents)}"
+            else:
+                context = f"url: {url} \n {'Это целый документ'.join(documents)}"
+
             response_from_model = self.generate(
                 question=question,
-                context=url + "Это целый документ".join(documents),
+                context=context,
                 stream=True,
             )
         return response_from_model
@@ -231,14 +244,15 @@ class LLMClientAdapter:
 
             def generate():
                 for token in response_generator:
-                    yield token["choices"][0]["delta"].get('content', '')
+                    yield token["choices"][0]["delta"].get("content", "")
 
             return generate()
         return response_generator["choices"][0]["message"]["content"]
 
     def _build_prompt(self, prompt, system_prompt):
 
-        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt},
+        ]
         return messages
-
-

@@ -132,16 +132,18 @@ class HTMLProcessor:
         content = BeautifulSoup(html_content, "html.parser")
 
         self.body = content.find("body")
+        if not self.body:
+            self.body = content
 
         head = content.find("head")
 
-        page_meta = self._process_head(str(head))
-        page_meta["url"] = page_url
-        if "lang" in content.html:
-            page_meta["language"] = content.html["lang"]
-
-        # html_content_added_ids = self.assign_ids(str(self.body))
-        # self.body = html_content_added_ids
+        if head:
+            page_meta = self._process_head(str(head))
+            page_meta["url"] = page_url
+            if "lang" in content.html:
+                page_meta["language"] = content.html["lang"]
+        else:
+            page_meta = {}
 
         documents, body_page_meta = self._process_body(
             self.body,
