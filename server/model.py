@@ -175,7 +175,7 @@ class LLMClientAdapter:
             question=question, context=context, system_prompt=system_prompt
         )
 
-        template = self._build_prompt_by_template_mistral(prompt, system_prompt)
+        template = self._build_prompt(prompt, system_prompt)
         if INFERENCE_TYPE == "llama.cpp":
             return self._llama_cpp_request(template, stream=stream)
 
@@ -221,7 +221,7 @@ class LLMClientAdapter:
         pass
 
     def _llama_cpp_request(self, template, stream=False):
-        response_generator = self.client.model.create_completion(
+        response_generator = self.client.model.create_chat_completion(
             template,
             stream=stream,
             max_tokens=self.max_new_tokens,
@@ -231,29 +231,14 @@ class LLMClientAdapter:
 
             def generate():
                 for token in response_generator:
-                    yield token["choices"][0]["text"]
+                    yield token["choices"][0]["delta"].get('content', '')
 
             return generate()
-        return response_generator["choices"][0]["text"]
+        return response_generator["choices"][0]["message"]["content"]
 
-    def _build_prompt_by_template_mistral(self, prompt, system_prompt):
+    def _build_prompt(self, prompt, system_prompt):
 
-        template = (
-            "[INST] <<SYS>>\n" + system_prompt + "\n<</SYS>>\n\n" + prompt + " [/INST]"
-        )
-        return template
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+        return messages
 
-    def _build_prompt_by_template_llama3(self, prompt, system_prompt):
-        template = (
-            PROMPT_TEMPLATE_START_OF_TURN
-            + "system"
-            + system_prompt
-            + PROMPT_TEMPLATE_END_OF_TURN
-            + PROMPT_TEMPLATE_START_OF_TURN
-            + "user"
-            + prompt
-            + PROMPT_TEMPLATE_END_OF_TURN
-            + PROMPT_TEMPLATE_START_OF_TURN
-            + "assistant"
-        )
-        return template
+
