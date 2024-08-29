@@ -48,7 +48,7 @@ class HTMLProcessor:
                 continue
             
             if tag.attrs:
-                attrs_to_keep = ['href']
+                attrs_to_keep = ['href', "id", "class"]
                 tag.attrs = {attr: value for attr, value in tag.attrs.items() if attr in attrs_to_keep}
         return str(html_tag)
 
@@ -84,24 +84,25 @@ class HTMLProcessor:
         return result
 
     def _concatenate_small_docs(self, docs, context_len_checker):
-        result = []
+        concatenated_docs = []
         current_doc = ""
 
         for doc in docs:
-            if context_len_checker(current_doc + "\n\n" + doc):
-                if current_doc:
-                    result.append(current_doc)
-                current_doc = doc
+            if current_doc:
+                combined_doc = current_doc + " " + doc
             else:
-                if current_doc:
-                    current_doc += "\n\n" + doc
-                else:
-                    current_doc = doc
+                combined_doc = doc
+
+            if context_len_checker(combined_doc):
+                current_doc = combined_doc
+            else:
+                concatenated_docs.append(current_doc)
+                current_doc = doc
 
         if current_doc:
-            result.append(current_doc)
+            concatenated_docs.append(current_doc)
 
-        return result
+        return concatenated_docs
 
     def _process_head(self, html_head):
         content = BeautifulSoup(html_head, "html.parser")
@@ -118,9 +119,8 @@ class HTMLProcessor:
                 str(html_content).replace("\\n", ""), "html.parser"
             )
             docs = self._split_tags_tree(html_body, context_len_checker)
-            print('CONCATENATE SMALL DOCS')
+            docs.sort(key=lambda x: context_len_checker(x, return_len=True), reverse=True)
             docs = self._concatenate_small_docs(docs, context_len_checker)
-            print('CONCATENATE SMALL DOCS END')
             docs = [d.strip() for d in docs if d.strip()]
             return docs, page_meta
 
@@ -151,7 +151,3 @@ class HTMLProcessor:
         )
         # page_meta.update(body_page_meta)
         return documents, page_meta
-
-    def process_relevant_documents(self, relevant_documents):
-        sorted(relevant_documents, key=lambda d: d.metadata["order"])
-        return [chunk.metadata["raw_content"] for chunk in relevant_documents]

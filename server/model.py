@@ -12,25 +12,26 @@ PROMPT_TEMPLATE_END_OF_TURN = """<|im_end|>"""
 PROMPT_TEMPLATE_START_OF_TURN = """<|im_start|>"""
 
 
-SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен, для поиска, суммаризации, объяснения и помощи работы с статьями, если ты не знаешь ответ скажи что не знаешь, если статья написана не на русском выдавай ответ на русском, не переводя технические термины, тебе будет предоставленн контекст статьи с ссылками, текстовой информацией в разрозненном виде, твоя задача помогать мне с любыми запросами что я тебя попрошу сделать с контекстом в виде статьи, которой ты получишь. Формат ответа.
+SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи мне в работе над статьями и любой информации, если ты не знаешь ответ скажи что не знаешь, если статья написана не на русском выдавай ответ на русском, не переводя технические термины, тебе будет предоставленн контекст статьи с ссылками, текстовой информацией в разрозненном виде, твоя задача помогать мне с любыми запросами что я тебя попрошу сделать с контекстом в виде статьи, которой ты получишь. Так же ты можешь получать не только целиком статью, а лишь ее кусок, так как текст может быть слишком большим, если кусок документа не релевантен к вопросу то просто напиши **Кусок документа не релевантен**, без объяснения почему он не релевантен.
+Формат ответа:
 
 Контекст: [Контекст в любой форме]
 Учитывая контекст, ответь на вопрос: [Вопрос]
 Ответ на вопрос: [ответ на вопрос с учетом контекста]
 """
 
-AGGREGATE_SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи мне в работе над статьями и любой информации. Ты работаешь как агрегатор информации из нескольких суммаризаций которые ты до этого обработал, все это на основе одного источника данных, я подавал их тебе частями т.к. документ слишком большой. Твоя задача — на основе суммаризаций, которые ты получишь, выдавать ответ.
+AGGREGATE_SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи мне в работе над статьями и любой информации. Ты работаешь как агрегатор информации из нескольких ответов которые ты до этого обработал, все это на основе одного источника данных, я подавал их тебе частями т.к. документ слишком большой. Твоя задача — на основе этих ответов по кускам данных одного цельного документа, которые ты получишь, выдавать ответ.
 
-Каждую суммаризацию рассматривай как часть общей мозаики. Если какой-то чанк содержит ключевую информацию, которая может помочь ответить на вопрос, используй её в ответе. Если разные части суммаризаций дополняют друг друга, объединяй их логично и последовательно. Если в суммаризациях есть противоречия, постарайся учесть их и предложить наиболее вероятный ответ.
+Каждую ответ рассматривай как часть общей мозаики. Если какой-то чанк содержит ключевую информацию, которая может помочь ответить на вопрос, используй её в ответе. Если разные ответы дополняют друг друга, объединяй их логично и последовательно. Если в ответах есть противоречия, постарайся учесть их и предложить наиболее вероятный ответ.
 
-Важно: Интегрируй информацию из всех релевантных суммаризаций таким образом, чтобы конечный ответ был полным, точным и содержал всю необходимую информацию для ответа на вопрос.
+Важно: Интегрируй информацию из всех релевантных ответов таким образом, чтобы конечный ответ был полным, точным и содержал всю необходимую информацию для ответа на вопрос.
 
 Если информации недостаточно для окончательного ответа, укажи это
 Формат ответа:
-Учитывая суммаризацию по частям, ответь на вопрос: [Вопрос по информации]
-Суммаризации по частям: 
-[Список суммаризаций по частям]
-Агрегированный ответ на вопрос: [Полный и точный ответ на вопрос с учётом всех суммаризаций]
+Учитывая свои прошлые ответы по частям, ответь на вопрос: [Вопрос по ответам]
+Ответы по частям: 
+[Список ответов по частям]
+Агрегированный ответ на вопрос: [Полный и точный ответ на вопрос с учётом всех ответов]
 
 """
 
@@ -127,13 +128,15 @@ class LLMClientAdapter:
                 if self.check_context_len(doc):
                     response = self.generate(
                         question=question,
-                        context=doc,
-                        system_prompt=SUMARIZE_SYSTEM_PROMPT,
+                        context=f"Это кусок документа:\n url: {url} \n" + doc,
+                        system_prompt=SYSTEM_PROMPT,
+                        stream=False,
                     )
                     print(response)
                     if "Кусок документа не релевантен" not in response:
                         relevant_chunks.append(response)
 
+            print([len(self.client.tokenize(text)) for text in relevant_chunks])
             print(relevant_chunks)
             response_from_model = self.generate(
                 question=question,
@@ -144,39 +147,37 @@ class LLMClientAdapter:
                     ]
                 ),
                 system_prompt=AGGREGATE_SYSTEM_PROMPT,
+                stream=True
             )
         else:
             print("GOODE")
             relevant_chunks = documents
             response_from_model = self.generate(
                 question=question,
-                context=url + "\n\nChunk/Data:\n".join(relevant_chunks),
+                context=url + "Это целый документ".join(documents),
+                stream=True,
             )
         return response_from_model
 
-    def check_context_len(self, text):
+    def check_context_len(self, text, return_len=False):
         context_len = len(self.client.tokenize(text))
-        print(context_len)
+        if return_len:
+            return context_len
+
         if context_len > self.max_context_size - self.max_prompt_size:
             return False
         return True
 
-    def generate(self, question, context=None, system_prompt=SYSTEM_PROMPT):
+    def generate(
+        self, question, context=None, system_prompt=SYSTEM_PROMPT, stream=False
+    ):
         prompt = self._make_user_query(
             question=question, context=context, system_prompt=system_prompt
         )
 
         template = self._build_prompt_by_template_mistral(prompt, system_prompt)
         if INFERENCE_TYPE == "llama.cpp":
-            if system_prompt == REWRITE_SYSTEM_PROMPT:
-                return self._llama_cpp_request(template, stream=False)
-            elif system_prompt == SYSTEM_PROMPT:
-                return self._llama_cpp_request(template, stream=True)
-            elif system_prompt == AGGREGATE_SYSTEM_PROMPT:
-                return self._llama_cpp_request(template, stream=True)
-            elif system_prompt == SUMARIZE_SYSTEM_PROMPT:
-                return self._llama_cpp_request(template, stream=False)
-            raise ValueError(f"{system_prompt} system_prompt not implemented")
+            return self._llama_cpp_request(template, stream=stream)
 
     def get_inference_client(
         self,
@@ -211,7 +212,7 @@ class LLMClientAdapter:
                 f"Контекс: {context}\nУчитывая контекст, ответь на вопрос: {question}"
             )
         elif system_prompt == AGGREGATE_SYSTEM_PROMPT:
-            user_query = f"Учитывая суммаризацию по частям, ответь на вопрос: {question}\nСуммаризации по частям: \n{context}\nАгрегированный ответ на вопрос: "
+            user_query = f"Учитывая свои прошлые ответы по частям, ответь на вопрос: {question}\Ответы по частям: \n{context}\nАгрегированный ответ на вопрос: "
         else:
             user_query = question
         return user_query
