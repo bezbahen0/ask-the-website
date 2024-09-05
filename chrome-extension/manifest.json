@@ -13,7 +13,7 @@
     "default_title": "Local LLama LLM AI Chat Query Tool"
   },
   "side_panel": {
-    "default_path": "panel.html"
+    "default_path": "side_panel/side_panel.html"
   },
   "commands": {
     "_execute_action": {
@@ -31,11 +31,18 @@
       "matches": [
         "<all_urls>"
       ],
+      "css": [
+        "backend/injected.css"
+      ],
       "js": [
-        "content.js"
+        "backend/content.js",
+        "backend/inspect.js"
       ]
     }
   ],
+  //"background": {
+  //  "service_worker": "backend/background.js"
+  //},
   "offline_enabled": true,
   "permissions": [
     "contextMenus",

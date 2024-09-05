@@ -159,6 +159,7 @@ class LLMClientAdapter:
             )
         else:
             print("GOODE")
+            print(documents)
             relevant_chunks = documents
             if page_meta:
                 context = f"document meta: {page_meta} url: {url} \n {'Это целый документ'.join(documents)}"
