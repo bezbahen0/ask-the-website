@@ -4,12 +4,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectTagButton = document.getElementById('selectTagButton');
     const resultDiv = document.getElementById('result');
     const serverCheckButton = document.getElementById('serverCheck');
-    const creatorButton = document.getElementById('creatorButton');
     const creatorWindow = document.getElementById('creator-wrapper');
-    const creatorClose = document.getElementById('creatorClose');
-    const helpWrapper = document.getElementById('help-wrapper');
-    const helpButton = document.getElementById('helpButton');
-    const helpClose = document.getElementById('helpClose');
     const clearConvo = document.getElementById('ClearConvo');
     const settingsButton = document.getElementById('settingMenuBtn');
     const settingsWindow = document.getElementById('settings-wrapper');
@@ -129,36 +124,6 @@ document.addEventListener('DOMContentLoaded', function () {
     clearConvo.addEventListener('click', function () {
         clearSavedData();
         resultDiv.innerHTML = '';
-    });
-
-    creatorButton.addEventListener('click', function () {
-        if (creatorContentOpen) {
-            creatorContentOpen = false;
-            creatorWindow.style.display = 'none';
-        } else {
-            creatorContentOpen = true;
-            creatorWindow.style.display = 'block';
-        }
-    });
-
-    creatorClose.addEventListener('click', function () {
-        creatorContentOpen = false;
-        creatorWindow.style.display = 'none';
-    });
-
-    helpButton.addEventListener('click', function () {
-        if (helpContentOpen) {
-            helpContentOpen = false;
-            helpWrapper.style.display = 'none';
-        } else {
-            helpContentOpen = true;
-            helpWrapper.style.display = 'block';
-        }
-    });
-
-    helpClose.addEventListener('click', function () {
-        helpContentOpen = false;
-        helpWrapper.style.display = 'none';
     });
 
     settingsButton.addEventListener('click', function () {
@@ -324,7 +289,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const action = "isInspectorActive";
             chrome.tabs.sendMessage(tabs[0].id, { action }, function (response) {
                 if (chrome.runtime.lastError) {
-                    console.error(chrome.runtime.lastError.message);
                     updateButtonState(false); // Assume inactive if there's an error
                     return;
                 }
@@ -347,32 +311,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     checkInspectorStatus();
 
-    //submitButton.addEventListener('click', function () {
-    //    const query = queryInput.value;
-    //    
-    //    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    //        chrome.tabs.sendMessage(tabs[0].id, { action: "getSelectedHMTL" }, function (response) {
-    //            console.log(response.selected);
-    //            if (response.selected) {
-    //                // Если selectedHTML выбран, отправляем его
-    //                console.log('Sending selected HTML instead of page content');
-    //                sendRequest(query, "", response.selected);
-    //            } else {
-    //                // Если selectedHTML не выбран, получаем содержимое страницы и отправляем его
-    //                console.log('Sending full page content');
-    //                getPageContent((pageData) => {
-    //                    sendRequest(query, pageData.url, pageData.content);
-    //                });
-    //            }
-    //    
-    //            // Отображаем запрос и сообщение "Llama is thinking..."
-    //            resultDiv.innerHTML += `<div class="user">You: ${query}</div>`;
-    //            resultDiv.innerHTML += `<div class="loading">"Llama is thinking..."</div>`;
-    //            resultDiv.scrollTop = resultDiv.scrollHeight;
-    //        });
-    //    });
-    //});
-
     submitButton.addEventListener('click', function () {
         const query = queryInput.value;
 
@@ -380,7 +318,6 @@ document.addEventListener('DOMContentLoaded', function () {
             chrome.tabs.sendMessage(tabs[0].id, { action: "getSelectedHMTL" }, function (response) {
                 if (response.selected !== "") {
                     console.log('Sending selected HTML instead of page content');
-                    //toggleInspector();
                     checkInspectorStatus()
                     sendRequest(query, tabs[0].url, response.selected);
                 } else {
@@ -390,7 +327,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 }
 
-                // Отображаем запрос и сообщение "Llama is thinking..."
                 resultDiv.innerHTML += `<div class="user">You: ${query}</div>`;
                 resultDiv.innerHTML += `<div class="loading">"Llama is thinking..."</div>`;
                 resultDiv.scrollTop = resultDiv.scrollHeight;

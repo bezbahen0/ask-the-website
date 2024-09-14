@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <title>Local Model Query</title>
-  <link rel="stylesheet" href="side_panel.css">
-  <script src="side_panel.js"></script>
+    <title>Local Model Query</title>
+    <link rel="stylesheet" href="side_panel.css">
+    <script src="side_panel.js"></script>
 </head>
+
 <body>
     <div id="tab"></div>
     <div id="chat-wrapper">
@@ -14,12 +16,10 @@
             <div id="result"></div>
             <input type="text" id="queryInput" placeholder="Enter your query">
             <div id="controls-wrapper">
-            <button id="submitButton">Submit</button>
-            <button id="selectTagButton">Select Tag</button>
-            <button id="settingMenuBtn">Settings</button>
-            <!-- <button id="serverCheck">Check Server</button> -->
-        <button id="helpButton">Help</button><button id="creatorButton">Support</button>
-        </div>
+                <button id="submitButton">Submit</button>
+                <button id="selectTagButton">Select Tag</button>
+                <button id="settingMenuBtn">Settings</button>
+            </div>
         </div>
         <div id="settings-wrapper">
             <div id="settings-content">
@@ -28,7 +28,7 @@
                 <p>Model Loaded: </p>
                 <p id="modelLoaded"></p>
                 <p>Check the Server is Live: <button id="serverCheck">Check Server</button></p>
-                <p>Select Model 
+                <p>Select Model
                     <select id="modelSelect">
                     </select>
                 </p>
@@ -39,38 +39,7 @@
                 <input type="text" id="serverPort" placeholder="Enter Server Port">
             </div>
         </div>
-        <div id="help-wrapper">
-            <div id="help-content">
-                <button id="helpClose">X</button>
-                <h3>Help/Instructions</h3>
-                <p>Thank you for choosing our Chrome extension. Below are step-by-step instructions to get started:</p>
-
-                <ol>
-                    <li>Install the accompanying Flask server using pip:</li>
-                    <pre><code>pip install local-llama</code></pre>
-
-                    <li>Run the server from the command line:</li>
-                    <pre><code>local-llama</code></pre>
-
-                    <li>Select your desired default model. If your folder contains multiple models, you can change them in the settings.</li>
-
-                    <li>Use the popup to query the server and harness its capabilities.</li>
-
-                    <li>Check the server's status with the "Check Server" button. Green indicates the server is up, while red indicates it's not.</li>
-                </ol>
-
-                <p>For more detailed information, please visit our <a class="repo-link" target="_blank" href="http://github.com/mrdiamonddirt/local-llama-chrome-extension">GitHub repository</a>.</p>
-                </div>
-        </div>
-        <div id="creator-wrapper">
-            <div id="creator-content">
-                <button id="creatorClose">X</button>
-                <h3>Creator: Rowan Wood</h3>
-                <p>Local Llama is a project that aims to make it easier to query local models. It is currently in development.</p>
-                <p>For Issues, Latest Versions and to Support please visit the <a class="repo-link" target="_blank" href="http://github.com/mrdiamonddirt/">GitHub repository</a>.</p>
-            </div>
-        </div>
-        <!-- <button id="serverStart">Start Server</button> -->
     </div>
 </body>
+
 </html>

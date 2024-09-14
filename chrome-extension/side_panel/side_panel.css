@@ -261,7 +261,7 @@ pre {
     margin: 5px;
     padding: 5px;
     color: white;
-    font-size: 10px;
+    font-size: 13px;
     font-weight: 100;
     outline: none;
     width: 90%;
@@ -281,8 +281,6 @@ pre {
     text-align: left;
     line-height: 1.5;
     font-family: "Poppins", sans-serif;
-    font-size: 10px;
-    font-weight: 100;
 }
 
 #serverCheck {
@@ -307,7 +305,7 @@ pre {
     margin: 0px 5px 0px 5px;
     overflow-y: scroll;
     color: white;
-    font-size: 10px;
+    font-size: 13px;
     /* chrome scroll bar customisation */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
