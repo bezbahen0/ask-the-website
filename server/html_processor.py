@@ -46,9 +46,12 @@ class HTMLProcessor:
             if tag.name in ["style", "script", "svg"]:
                 tag.decompose()
                 continue
-            
+
             if tag.attrs:
-                attrs_to_keep = ['href', "id", "class"]
+                #if "id" in tag.attrs:
+                #    print(tag.attrs["id"])
+                #attrs_to_keep = ['href', "id", "class"]
+                attrs_to_keep = []
                 tag.attrs = {attr: value for attr, value in tag.attrs.items() if attr in attrs_to_keep}
         return str(html_tag)
 

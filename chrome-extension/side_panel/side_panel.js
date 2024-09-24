@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const queryInput = document.getElementById('queryInput');
     const submitButton = document.getElementById('submitButton');
     const selectTagButton = document.getElementById('selectTagButton');
+    const stopButton = document.getElementById('selectTagButton');
     const resultDiv = document.getElementById('result');
     const serverCheckButton = document.getElementById('serverCheck');
     const creatorWindow = document.getElementById('creator-wrapper');
@@ -283,6 +284,25 @@ document.addEventListener('DOMContentLoaded', function () {
     selectTagButton.addEventListener('click', function () {
         toggleInspector();
     });
+
+    stopButton.addEventListener('click', function () {
+        var req_url = 'http://' + ip + ':' + port + '/stop_query_generation';
+        fetch(req_url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+            mode: 'cors',
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Generation canceled")
+            })
+            .catch(error => {
+                console.log("ERROR when try cansel generation")
+            });
+    })
 
     function checkInspectorStatus() {
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {

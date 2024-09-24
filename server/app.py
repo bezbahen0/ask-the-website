@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 
-llm_model = LLMClientAdapter(temperature=0.2, max_new_tokens=2048)
+llm_model = LLMClientAdapter(temperature=0.2, max_new_tokens=1000)
 
 
 @app.get("/get_current_model")
@@ -48,13 +48,20 @@ async def load_model(model: dict):
 async def get_gguf_files():
     return {"gguf_files": os.listdir(LLM_FOLDER_PATH)}
 
-
+import pprint 
 @app.post("/query")
 async def handle_query(query: dict):
+    #pprint.pp(query["page_content"])
     response_from_model = llm_model.question_answer_with_context(
         query["query"], query["page_content"], query["page_url"]
     )
     return StreamingResponse(response_from_model, media_type="text/plain")
+
+
+@app.get("/stop_query_generation")
+async def stop_query_generation():
+    llm_model.stop_response_generation()
+    return {"status": "Cancellation requested"}
 
 
 @app.get("/health")

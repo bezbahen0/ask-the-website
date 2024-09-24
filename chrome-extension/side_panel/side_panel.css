@@ -220,6 +220,20 @@ pre {
     outline: none;
 }
 
+#stopButton {
+    background-color: rgb(4, 249, 4);
+    border: 1px solid grey;
+    border-radius: 5px;
+    margin: 0px;
+    padding: 5px;
+    color: Black;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    outline: none;
+}
+
+
 #selectTagButton.active {
     background-color: red;
 }

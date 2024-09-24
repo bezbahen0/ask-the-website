@@ -3,11 +3,12 @@ from llama_cpp import Llama
 from server.page_processor import get_processor
 from server.vectorizer import Vectorizer
 from tqdm import tqdm
-
+import tiktoken
+from openai import OpenAI
 
 LLM_PATH = "models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf"
 LLM_MODEL = "Mistral-7B-Instruct-v0.3-Q8_0.gguf"
-INFERENCE_TYPE = "llama.cpp"
+INFERENCE_TYPE = "vllm"
 PROMPT_TEMPLATE_END_OF_TURN = """<|im_end|>"""
 PROMPT_TEMPLATE_START_OF_TURN = """<|im_start|>"""
 
@@ -20,7 +21,7 @@ SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи 
 Ответ на вопрос: [ответ на вопрос с учетом контекста]
 """
 
-AGGREGATE_SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи мне в работе над статьями и любой информации. Ты выдаешь конечный ответ из нескольких ответов которые ты до этого дал, все это на основе одного источника данных, но разные его части, я подавал их тебе частями т.к. документ слишком большой. Твоя задача — на основе этих ответов по кускам данных одного цельного документа, которые ты получишь, выдавать ответ.
+AGGREGATE_SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи мне в работе над статьями и любой информации. Ты работаешь как агрегатор информации из нескольких ответов которые ты до этого обработал, все это на основе одного источника данных, я подавал их тебе частями т.к. документ слишком большой. Твоя задача — на основе этих ответов по кускам данных одного цельного документа, которые ты получишь, выдавать ответ.
 
 Каждую ответ рассматривай как часть общей мозаики. Если какой-то чанк содержит ключевую информацию, которая может помочь ответить на вопрос, используй её в ответе. Если разные ответы дополняют друг друга, объединяй их логично и последовательно. Если в ответах есть противоречия, постарайся учесть их и предложить наиболее вероятный ответ.
 
@@ -81,8 +82,8 @@ class LLMClientAdapter:
         self,
         temperature,
         max_new_tokens,
-        max_context_size=16000,
-        max_prompt_size=3000,
+        max_context_size=8000,
+        max_prompt_size=2000,
         repeat_penalty=1.1,
         top_k=30,
         top_p=1.0,
@@ -104,7 +105,9 @@ class LLMClientAdapter:
         )
         # self.vector_processor = Vectorizer()
         self.content_processor = get_processor()
-        self.cancel_generation_flag = False
+        self.encoding = tiktoken.get_encoding("cl100k_base")
+
+
 
     def question_answer_with_context(self, question, context, url):
 
@@ -123,14 +126,10 @@ class LLMClientAdapter:
                 context_len_checker=self.check_context_len,
             )
             print(f"Find {len(documents)} chunks")
-            self.cancel_generation_flag = False
-            #return "хуй большой в жопе"
+
             relevant_chunks = []
             for doc in tqdm(documents):
                 if self.check_context_len(doc):
-                    if self.cancel_generation_flag:
-                        return "Response generation canceled"
-
                     if page_meta:
                         context = (
                             f"Это кусок документа:\n url: {url} \n document meta: {page_meta}"
@@ -149,13 +148,13 @@ class LLMClientAdapter:
                     if "Кусок документа не релевантен" not in response:
                         relevant_chunks.append(response)
 
-            print([len(self.client.tokenize(text)) for text in relevant_chunks])
-            #print(relevant_chunks)
+            #print([len(self.client.tokenize(text)) for text in relevant_chunks])
+            print(relevant_chunks)
             response_from_model = self.generate(
                 question=question,
                 context="\n\n".join(
                     [
-                        f"Ответ по куску данных номер {i} из {len(relevant_chunks)}:\n\n{r}"
+                        f"Ответ по куску данных номер {i}:\n\n{r}"
                         for i, r in enumerate(relevant_chunks)
                     ]
                 ),
@@ -179,11 +178,14 @@ class LLMClientAdapter:
         return response_from_model
 
     def check_context_len(self, text, return_len=False):
-        context_len = len(self.client.tokenize(text))
+        if INFERENCE_TYPE == "llama.cpp":
+            context_len = len(self.client.tokenize(text))
+        else:
+            context_len = len(self.encoding.encode(text))
         if return_len:
             return context_len
 
-        if context_len > self.max_context_size - self.max_prompt_size:
+        if context_len > self.max_context_size - self.max_prompt_size - self.max_new_tokens:
             return False
         return True
 
@@ -197,9 +199,8 @@ class LLMClientAdapter:
         template = self._build_prompt(prompt, system_prompt)
         if INFERENCE_TYPE == "llama.cpp":
             return self._llama_cpp_request(template, stream=stream)
-
-    def stop_response_generation(self):
-        self.cancel_generation_flag = True
+        elif INFERENCE_TYPE == "vllm":
+            return self._vllm_request(template, stream=stream)
 
     def get_inference_client(
         self,
@@ -219,6 +220,12 @@ class LLMClientAdapter:
                 n_ctx=max_context_size,
                 top_k=top_k,
                 top_p=top_p,
+            )
+        elif INFERENCE_TYPE == "vllm":
+            from openai import OpenAI
+            return OpenAI(
+                api_key="EMPTY",
+                base_url="http://178.163.233.198:8000/v1",
             )
         else:
             raise NotImplementedError
@@ -251,20 +258,31 @@ class LLMClientAdapter:
         )
         if stream:
 
-            self.cancel_generation_flag = False
-
             def generate():
-                try:
-                    for token in response_generator:
-                        if self.cancel_generation_flag:
-                            print("Generation cancelled.")
-                            break
-                        yield token["choices"][0]["delta"].get("content", "")
-                except Exception as e:
-                    print(f"Error during response generation: {e}")
+                for token in response_generator:
+                    yield token["choices"][0]["delta"].get("content", "")
 
             return generate()
         return response_generator["choices"][0]["message"]["content"]
+
+    def _vllm_request(self, template, stream=False):
+        response_generator = self.client.chat.completions.create(
+            messages=template,
+            model="IlyaGusev/saiga_llama3_8b",
+            stream=stream,
+            max_tokens=self.max_new_tokens,
+            temperature=self.temperature,
+        )
+        if stream:
+
+            def generate():
+                for token in response_generator:                    
+                    delta = token.choices[0].delta.content
+                    if delta:
+                        yield delta
+            return generate()
+
+        return response_generator.choices[0].message.content
 
     def _build_prompt(self, prompt, system_prompt):
 
