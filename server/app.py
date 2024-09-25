@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from server.constants import LLM_FOLDER_PATH
-from server.model import LLMClientAdapter
+from server.agent.html_agent import HTMLAgent
 
 app = FastAPI()
 
@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 
-llm_model = LLMClientAdapter(temperature=0.2, max_new_tokens=2048)
+llm_model = HTMLAgent(temperature=0.2, max_new_tokens=2048)
 
 
 @app.get("/get_current_model")
@@ -34,7 +34,7 @@ async def load_model(model: dict):
     global llm_model
     print(model)
 
-    llm_model = LLMClientAdapter(
+    llm_model = HTMLAgent(
         model_path=os.path.join(LLM_FOLDER_PATH, model["model"]),
         model_name=model["model"],
         temperature=0.2,
