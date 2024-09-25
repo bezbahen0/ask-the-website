@@ -5,8 +5,8 @@ from server.vectorizer import Vectorizer
 from tqdm import tqdm
 
 
-LLM_PATH = "models/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf"
-LLM_MODEL = "Mistral-7B-Instruct-v0.3-Q8_0.gguf"
+LLM_PATH = "models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+LLM_MODEL = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 INFERENCE_TYPE = "llama.cpp"
 PROMPT_TEMPLATE_END_OF_TURN = """<|im_end|>"""
 PROMPT_TEMPLATE_START_OF_TURN = """<|im_start|>"""
@@ -124,15 +124,18 @@ class LLMClientAdapter:
             print(f"Find {len(documents)} chunks")
 
             relevant_chunks = []
-            for doc in tqdm(documents):
+            for index, doc in tqdm(enumerate(documents)):
                 if self.check_context_len(doc):
                     if page_meta:
                         context = (
-                            f"Это кусок документа:\n url: {url} \n document meta: {page_meta}"
+                            f"Это кусок документа:\n url: {url} \n document meta: {page_meta} \nПорядок этого куска документа по отношению ко всему документу: 0..{index}"
                             + doc
                         )
                     else:
-                        context = f"Это кусок документа:\n url: {url} \n" + doc
+                        context = (
+                            f"Порядок документа: {index} из {len(documents)} документов:\n url: {url} \n"
+                            + doc
+                        )
 
                     response = self.generate(
                         question=question,
