@@ -1,6 +1,6 @@
 
 from server.model import LlamaCppWrapper
-from server.page_processor import get_processor
+from server.partition import get_processor
 from tqdm import tqdm
 
 

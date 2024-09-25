@@ -1,4 +1,4 @@
-from server.html_processor import HTMLProcessor
+from server.partition.html_processor import HTMLProcessor
 
 
 def get_processor(page_type="html"):
