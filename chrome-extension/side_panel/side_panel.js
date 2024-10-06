@@ -73,23 +73,72 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     });
 
-    function saveQuestionAndResponse(question, response) {
-        const savedData = JSON.parse(localStorage.getItem('savedCoversation')) || [];
-        savedData.push({ question, response });
-        localStorage.setItem('savedCoversation', JSON.stringify(savedData));
-    }
-
     // Function to recover and display saved questions and responses
-    function displaySavedData() {
-        const savedData = JSON.parse(localStorage.getItem('savedCoversation')) || [];
-        for (const entry of savedData) {
-            resultDiv.innerHTML += `<div class="user">You said: ${entry.question}</div>`;
-            resultDiv.innerHTML += `<div class="bot">Response: ${entry.response}</div>`;
+    async function displaySavedData() {
+        const last_chat_id = localStorage.getItem('chat_id');
+        if (last_chat_id) {
+            const messages = await get_messages(last_chat_id);
+            console.log("messages:", messages);
+            if (messages) {
+                console.log("hui")
+                for (const entry of messages) {
+                    if ("user" in entry) {
+                        resultDiv.innerHTML += `<div class="user">You said: ${entry.user}</div>`;
+                    }
+                    else {
+                        resultDiv.innerHTML += `<div class="bot">Response: ${entry.bot}</div>`;
+                    }
+                }
+            }
+            console.log("hui1")
+        }
+        else {
+            get_new_chat_id();
         }
     }
 
+    function get_new_chat_id() {
+        var req_url = 'http://' + ip + ':' + port + '/get_chat_id';
+        fetch(req_url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+            mode: 'cors',
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Received data:", data);
+                localStorage.setItem('chat_id', data.new_chat_id);
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+    }
+
+    function get_messages(chat_id) {
+        var req_url = 'http://' + ip + ':' + port + '/get_chat_messages';
+        return fetch(req_url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ chat_id: chat_id })
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Received data:", data);
+                return data.dialog;
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
+    }
+
+
     function clearSavedData() {
-        localStorage.removeItem('savedCoversation');
+        localStorage.removeItem('chat_id');
         resultDiv.innerHTML = '';
     }
 
@@ -123,7 +172,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
     clearConvo.addEventListener('click', function () {
         clearSavedData();
-        resultDiv.innerHTML = '';
+
+        var req_url = 'http://' + ip + ':' + port + '/get_chat_id';
+        fetch(req_url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+            mode: 'cors',
+        })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Received data:", data);
+                localStorage.setItem('chat_id', data.new_chat_id);
+            })
+            .catch(error => {
+                console.error("Error:", error);
+            });
     });
 
     settingsButton.addEventListener('click', function () {
@@ -313,17 +379,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     submitButton.addEventListener('click', function () {
         const query = queryInput.value;
+        const chat_id = localStorage.getItem("chat_id")
 
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             chrome.tabs.sendMessage(tabs[0].id, { action: "getSelectedHMTL" }, function (response) {
                 if (response.selected !== "") {
                     console.log('Sending selected HTML instead of page content');
                     checkInspectorStatus()
-                    sendRequest(query, tabs[0].url, response.selected);
+                    sendRequest(query, chat_id, tabs[0].url, response.selected);
                 } else {
                     console.log('Sending full page content');
                     getPageContent((pageData) => {
-                        sendRequest(query, pageData.url, pageData.content);
+                        sendRequest(query, chat_id, pageData.url, pageData.content);
                     });
                 }
 
@@ -335,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 
-    function sendRequest(query, pageUrl, pageContent) {
+    function sendRequest(query, chat_id, pageUrl, pageContent) {
         const req_url = 'http://' + ip + ':' + port + '/query';
         let accumulatedResponse = ''; // Declare accumulatedResponse in the outer scope
         let isStreamEnded = false; // Flag to track if the stream has ended
@@ -345,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ query, page_url: pageUrl, page_content: pageContent }),
+            body: JSON.stringify({ query, chat_id: chat_id, page_url: pageUrl, page_content: pageContent }),
         })
             .then(response => {
                 if (!response.ok) {
@@ -405,7 +472,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Optionally, you can also update the text here if needed
                         // finalResponse.innerHTML = `Response: ${accumulatedResponse}`;
                     }
-                    saveQuestionAndResponse(query, accumulatedResponse);
                     queryInput.value = '';
                 }
             })

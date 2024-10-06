@@ -25,7 +25,13 @@ dialogue_manager = DialogManager()
 
 @app.get("/get_chat_id")
 async def get_new_chat_id():
-    return dialogue_manager.get_chat_id()
+    return {"new_chat_id" : dialogue_manager.get_chat_id()}
+
+
+@app.post("/get_chat_messages")
+async def get_chat_messages(chat_id: dict):
+    print(chat_id["chat_id"])
+    return {"dialog": dialogue_manager.get_chat_messages(chat_id=chat_id["chat_id"])}
 
 
 @app.get("/get_current_model")
@@ -50,7 +56,7 @@ async def get_gguf_files():
 @app.post("/query")
 async def handle_query(query: dict):
     response_from_model = dialogue_manager.add_chat_query(
-        "c303282d-f2e6-46ca-a04a-35d3d873712d",
+        query["chat_id"],
         query["query"],
         query["page_content"],
         query["page_url"],

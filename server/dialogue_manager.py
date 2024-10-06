@@ -49,6 +49,9 @@ class DialogManager:
 
     def get_chat_id(self):
         return str(uuid.uuid4())
+    
+    def get_chat_messages(self, chat_id):
+        return [{message.role: message.message} for message in get_chat_messages(chat_id=chat_id)]
 
     def change_dialog_model(self, model_name):
         self.agent = HTMLAgent(

@@ -128,8 +128,7 @@ class HTMLAgent:
                     print("\n\nRESPONSE: \n\n")
                     print(response)
                     print("\n\n--------------------------\n\n")
-                    if "Кусок документа не релевантен" not in response:
-                        relevant_chunks.append(response)
+                    relevant_chunks.append(response)
 
             print([len(self.client.tokenize(text)) for text in relevant_chunks])
             print(relevant_chunks)
