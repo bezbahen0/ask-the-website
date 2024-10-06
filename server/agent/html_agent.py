@@ -52,7 +52,7 @@ Output:
 Expanded query: [A single, comprehensive question or statement that incorporates all the above elements]"""
 
 
-SUMARIZE_SYSTEM_PROMPT = """Твоя задача - суммаризировать полученный кусок из документа, я буду давать тебе кусок документа и вопрос который задан по всему документу твоя задача, если кусок документа релевантен к вопросу, то выдели основную релевантную к вопросу информацию и суммаризируй ее, если кусок документа не релевантен к вопросу то просто напиши **Кусок документа не релевантен**, без объяснения почему он не релевантен, чтобы в конечном ответе мне не было необходимости расматривать этот кусок документа"""
+SUMARIZE_SYSTEM_PROMPT = """Твоя задача анализировать приведенную часть документа и цитировать  из него только информацию относящуюся к основному вопросу, Цитируй без дублирования информации. Если в части документа нет информации котороую можно было бы процитировать напиши **Кусок документа не релевантен**, без объяснения почему он не релевантен."""
 
 
 class HTMLAgent:
@@ -122,7 +122,12 @@ class HTMLAgent:
                         system_prompt=SYSTEM_PROMPT,
                         stream=False,
                     )
+                    print("\n\n--------------------------\n\n")
+                    print("\n\nCHUNK: \n\n")
+                    print(doc)
+                    print("\n\nRESPONSE: \n\n")
                     print(response)
+                    print("\n\n--------------------------\n\n")
                     if "Кусок документа не релевантен" not in response:
                         relevant_chunks.append(response)
 
@@ -198,7 +203,7 @@ class HTMLAgent:
             user_query = f"Input:\nOriginal query: {question}\nDocument metadata: {context}\n\nOutput:\nExpanded query: "
         elif system_prompt == SUMARIZE_SYSTEM_PROMPT:
             user_query = (
-                f"Контекс: {context}\nУчитывая контекст, ответь на вопрос: {question}"
+                f"Контекс: {context}\nВопрос: {question}"
             )
         elif system_prompt == AGGREGATE_SYSTEM_PROMPT:
             user_query = f"Учитывая свои прошлые ответы по частям, ответь на вопрос: {question}\Ответы по частям: \n{context}\nАгрегированный ответ на вопрос: "

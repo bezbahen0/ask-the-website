@@ -5,8 +5,7 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from server.constants import LLM_FOLDER_PATH
-from server.agent.html_agent import HTMLAgent
+from server.dialogue_manager import DialogManager
 
 app = FastAPI()
 
@@ -21,38 +20,40 @@ app.add_middleware(
 )
 
 
-llm_model = HTMLAgent(temperature=0.2, max_new_tokens=2048)
+dialogue_manager = DialogManager()
+
+
+@app.get("/get_chat_id")
+async def get_new_chat_id():
+    return dialogue_manager.get_chat_id()
 
 
 @app.get("/get_current_model")
 async def get_current_model():
-    return {"current_model": llm_model.model_name}
+    return {"current_model": dialogue_manager.get_current_model()}
 
 
 @app.post("/load_model")
 async def load_model(model: dict):
-    global llm_model
     print(model)
 
-    llm_model = HTMLAgent(
-        model_path=os.path.join(LLM_FOLDER_PATH, model["model"]),
-        model_name=model["model"],
-        temperature=0.2,
-        max_new_tokens=2048,
-    )
+    dialogue_manager.change_dialog_model(model_name=model["model"])
 
     return {"status": "Model loaded successfully"}
 
 
 @app.get("/get_gguf_files")
 async def get_gguf_files():
-    return {"gguf_files": os.listdir(LLM_FOLDER_PATH)}
+    return {"gguf_files": dialogue_manager.get_existed_models()}
 
 
 @app.post("/query")
 async def handle_query(query: dict):
-    response_from_model = llm_model.question_answer_with_context(
-        query["query"], query["page_content"], query["page_url"]
+    response_from_model = dialogue_manager.add_chat_query(
+        "c303282d-f2e6-46ca-a04a-35d3d873712d",
+        query["query"],
+        query["page_content"],
+        query["page_url"],
     )
     return StreamingResponse(response_from_model, media_type="text/plain")
 
