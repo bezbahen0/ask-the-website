@@ -1,12 +1,20 @@
 from llama_cpp import Llama
 
-from server.page_processor import get_processor
+from server.partition import get_processor
 from tqdm import tqdm
 
 
 class LlamaCppWrapper:
     def __init__(
-        self, model_path, n_ctx, top_k, top_p, temperature, repeat_penalty, max_tokens, max_prompt_size
+        self,
+        model_path,
+        n_ctx,
+        top_k,
+        top_p,
+        temperature,
+        repeat_penalty,
+        max_tokens,
+        max_prompt_size,
     ):
         self.model = Llama(
             model_path=model_path,
@@ -24,10 +32,20 @@ class LlamaCppWrapper:
         self.temperature = temperature
         self.repeat_penalty = repeat_penalty
         self.max_tokens = max_tokens
-        self.temperature = temperature
-        self.max_tokens = max_tokens
         self.max_new_tokens = self.max_tokens - self.n_ctx
         self.max_prompt_size = max_prompt_size
+
+    def get_params(self):
+        return {
+            "n_ctx": self.n_ctx,
+            "top_k": self.top_k,
+            "top_p": self.top_p,
+            "temperature": self.temperature,
+            "repeat_penalty": self.repeat_penalty,
+            "max_tokens": self.max_tokens,
+            "max_new_tokens": self.max_tokens - self.n_ctx,
+            "max_prompt_size": self.max_prompt_size,
+        }
 
     def tokenize(self, text):
         return self.model.tokenize(text.encode("utf8"))
