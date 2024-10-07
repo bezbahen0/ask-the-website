@@ -14,24 +14,28 @@ class DialogManager:
         add_message(
             1,
             chat_id=chat_id,
-            url=url,
+            url=url,    
             file_type=file_type,
             role="user",
             message=user_query,
             model_name='',
             service_comments='',
-            version="0.2.6",
+            version="0.3.0",
         )
 
-        print([message.message for message in get_chat_messages(chat_id=chat_id)])
-
-        response_from_model = self.agent.question_answer_with_context(
+        chat_history = get_chat_messages(chat_id=chat_id)
+        # rewrited_question = self.agent.rewrite_question_with_context(user_query, chat_history)
+        print(user_query)
+        # print(rewrited_question)
+        response_from_model = self.agent.get_relevant_info(
             user_query, page_content, url
         )
+
+        bot_response = self.agent.generate_chat_response(get_chat_messages(chat_id=chat_id), response_from_model)
         
         # handle bot response and write to db
         complete_response = ""
-        for chunk in response_from_model:
+        for chunk in bot_response:
             complete_response += chunk
             yield chunk  
 
@@ -44,7 +48,7 @@ class DialogManager:
             message=complete_response,
             model_name=self.agent.model_name,
             service_comments=f'{self.agent.client.get_params()}',
-            version="0.2.6",
+            version="0.3.0",
         )
 
     def get_chat_id(self):

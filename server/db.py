@@ -114,5 +114,5 @@ if __name__ == "__main__":
         "just test message",
         "no model",
         "no service",
-        "0.2.6",
+        "0.3.0",
     )

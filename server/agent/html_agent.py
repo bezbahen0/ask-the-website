@@ -1,4 +1,3 @@
-
 from server.model import LlamaCppWrapper
 from server.partition import get_processor
 from tqdm import tqdm
@@ -11,45 +10,27 @@ PROMPT_TEMPLATE_END_OF_TURN = """<|im_end|>"""
 PROMPT_TEMPLATE_START_OF_TURN = """<|im_start|>"""
 
 
-SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи мне в работе над статьями и любой информации, если ты не знаешь ответ скажи что не знаешь, если статья написана не на русском выдавай ответ на русском, не переводя технические термины, тебе будет предоставленн контекст статьи с ссылками, текстовой информацией в разрозненном виде, твоя задача помогать мне с любыми запросами что я тебя попрошу сделать с контекстом в виде статьи, которой ты получишь. Так же ты можешь получать не только целиком статью, а лишь ее кусок, так как текст может быть слишком большим, если кусок документа не релевантен к вопросу то просто напиши **Кусок документа не релевантен**, без объяснения почему он не релевантен.
-Формат ответа:
+SYSTEM_PROMPT = """Твоя задача быть ассистен для помощи мне в работе над статьями и любой информации, если ты не знаешь ответ скажи что не знаешь, если статья написана не на русском выдавай ответ на русском, не переводя технические термины, тебе будет предоставленн контекст статьи с ссылками, текстовой информацией в разрозненном виде, твоя задача помогать мне с любыми запросами что я тебя попрошу сделать с контекстом в виде статьи, которой ты получишь."""
 
-Контекст: [Контекст в любой форме]
-Учитывая контекст, ответь на вопрос: [Вопрос]
-Ответ на вопрос: [ответ на вопрос с учетом контекста]
-"""
-
-AGGREGATE_SYSTEM_PROMPT = """Ты мой Q/A бот, ассистен для помощи мне в работе над статьями и любой информации. Ты работаешь как агрегатор информации из нескольких ответов которые ты до этого обработал, все это на основе одного источника данных, я подавал их тебе частями т.к. документ слишком большой. Твоя задача — на основе этих ответов по кускам данных одного цельного документа, которые ты получишь, выдавать ответ.
+AGGREGATE_SYSTEM_PROMPT = """Твоя роль это ассистен для помощи мне в работе над статьями и любой информации. 
 
 Каждую ответ рассматривай как часть общей мозаики. Если какой-то чанк содержит ключевую информацию, которая может помочь ответить на вопрос, используй её в ответе. Если разные ответы дополняют друг друга, объединяй их логично и последовательно. Если в ответах есть противоречия, постарайся учесть их и предложить наиболее вероятный ответ.
 
 Важно: Интегрируй информацию из всех релевантных ответов таким образом, чтобы конечный ответ был полным, точным и содержал всю необходимую информацию для ответа на вопрос.
 
 Если информации недостаточно для окончательного ответа, укажи это
-Формат ответа:
-Учитывая свои прошлые ответы по частям, ответь на вопрос: [Вопрос по ответам]
-Ответы по частям: 
-[Список ответов по частям]
-Агрегированный ответ на вопрос: [Полный и точный ответ на вопрос с учётом всех ответов]
-
 """
 
-REWRITE_SYSTEM_PROMPT = """You are an advanced query expansion system. Your task is to take a user's original query and relevant document metadata, then produce a single, comprehensive expanded query. This expanded query should:
 
-1. Maintain the core intent of the original question
-2. Incorporate key information from the provided metadata
-3. Add relevant domain-specific terminology
-4. Include synonyms or related concepts
-5. Be formulated as a single, detailed question or statement
+REWRITE_SYSTEM_PROMPT = """Твоя задача обрабатывать пользовательский вопрос и решать эллиптические фразы, т.е. дополнять существующий эллиптрический ,пользовательский, вопрос и давать мне его развернутый вид, по типу 
+user: какая погада сегодня 
+bot: +19 солнечно, 
+user: а на заватра? 
 
-Remember, the goal is to create one expanded query that will improve semantic search results in a vector database like ChromaDB.
-
-Input:
-Original query: [user's question]
-Document metadata: [title, keywords, or other relevant information]
-
-Output:
-Expanded query: [A single, comprehensive question or statement that incorporates all the above elements]"""
+Результатом является - какая погда завтра?.
+Убери лишний текст и оставь только развернутый текст вопроса.
+Исправь стилистические и синтаксические ошибки.
+Приведи только итоговый текст без предисловий."""
 
 
 SUMARIZE_SYSTEM_PROMPT = """Твоя задача анализировать приведенную часть документа и цитировать  из него только информацию относящуюся к основному вопросу, Цитируй без дублирования информации. Если в части документа нет информации котороую можно было бы процитировать напиши **Кусок документа не релевантен**, без объяснения почему он не релевантен."""
@@ -79,12 +60,27 @@ class HTMLAgent:
         self.top_p = top_p
         self.system_prompt = system_prompt
         self.client = self.get_inference_client(
-            temperature, repeat_penalty, top_k, top_p, max_new_tokens, max_context_size, max_prompt_size
+            temperature,
+            repeat_penalty,
+            top_k,
+            top_p,
+            max_new_tokens,
+            max_context_size,
+            max_prompt_size,
         )
         # self.vector_processor = Vectorizer()
         self.content_processor = get_processor()
 
-    def question_answer_with_context(self, question, context, url):
+    def rewrite_question_with_context(self, question, dialog_history):
+        response = self.generate(
+            question=question,
+            context="\n".join([f"{d.role}: {d.message}" for d in dialog_history]),
+            system_prompt=REWRITE_SYSTEM_PROMPT,
+            stream=False,
+        )
+        return response
+
+    def get_relevant_info(self, question, context, url):
 
         print(f"page_url: {url}")
         self.content_processor = get_processor(page_type="html")
@@ -119,7 +115,7 @@ class HTMLAgent:
                     response = self.generate(
                         question=question,
                         context=context,
-                        system_prompt=SYSTEM_PROMPT,
+                        system_prompt=SUMARIZE_SYSTEM_PROMPT,
                         stream=False,
                     )
                     print("\n\n--------------------------\n\n")
@@ -130,34 +126,47 @@ class HTMLAgent:
                     print("\n\n--------------------------\n\n")
                     relevant_chunks.append(response)
 
-            print([len(self.client.tokenize(text)) for text in relevant_chunks])
-            print(relevant_chunks)
-            response_from_model = self.generate(
-                question=question,
-                context="\n\n".join(
-                    [
-                        f"Ответ по куску данных номер {i}:\n\n{r}"
-                        for i, r in enumerate(relevant_chunks)
-                    ]
-                ),
-                system_prompt=AGGREGATE_SYSTEM_PROMPT,
-                stream=True,
-            )
+            # print([len(self.client.tokenize(text)) for text in relevant_chunks])
+            # print(relevant_chunks)
+            # response_from_model = self.generate(
+            #    question=question,
+            #    context="\n\n".join(
+            #        [
+            #            f"Ответ по куску данных номер {i}:\n\n{r}"
+            #            for i, r in enumerate(relevant_chunks)
+            #        ]
+            #    ),
+            #    system_prompt=AGGREGATE_SYSTEM_PROMPT,
+            #    stream=True,
+            # )
+            response_from_model = "\n\n".join(relevant_chunks)
         else:
-            print("GOODE")
-            print(documents)
-            relevant_chunks = documents
-            if page_meta:
-                context = f"document meta: {page_meta} url: {url} \n {'Это целый документ'.join(documents)}"
-            else:
-                context = f"url: {url} \n {'Это целый документ'.join(documents)}"
-
+            # print("GOODE")
+            # print(documents)
+            # relevant_chunks = documents
+            # if page_meta:
+            #    context = f"document meta: {page_meta} url: {url} \n {'Это целый документ'.join(documents)}"
+            # else:
+            #    context = f"url: {url} \n {'Это целый документ'.join(documents)}"
+            #
             response_from_model = self.generate(
                 question=question,
-                context=context,
-                stream=True,
+                context="\n".join(documents),
+                system_prompt=SUMARIZE_SYSTEM_PROMPT,
+                stream=False,
             )
         return response_from_model
+
+    def generate_chat_response(self, dialog_history, relevant_chunks_responses):
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        for conv in dialog_history:
+            if conv.role == "user":
+                messages.append({"role": "user", "content": conv.message})
+            else:
+                messages.append({"role": "assistant", "content": conv.message})
+        
+        messages[-1]["content"] = f"{messages[-1]['content']}\n\nКонтекст:\n```{relevant_chunks_responses}```"
+        return self.client.generate(messages, stream=True)
 
     def generate(
         self, question, context=None, system_prompt=SYSTEM_PROMPT, stream=False
@@ -196,16 +205,18 @@ class HTMLAgent:
 
     def _make_user_query(self, question, context, system_prompt):
         if system_prompt == SYSTEM_PROMPT:
-            user_query = f"Контекст: {context}\n\Учитывая контекст, ответь на вопрос: {question}\n\nОтвет на вопрос:"
+            user_query = (
+                f"Контекст: {context}\n\Учитывая контекст, ответь на вопрос: {question}"
+            )
         elif system_prompt == REWRITE_SYSTEM_PROMPT:
             # user_query = f"Исходный вопрос: {question}\nКонтекстная информация:\n- Метаданные: {context}\nРасширенный запрос: "
-            user_query = f"Input:\nOriginal query: {question}\nDocument metadata: {context}\n\nOutput:\nExpanded query: "
-        elif system_prompt == SUMARIZE_SYSTEM_PROMPT:
             user_query = (
-                f"Контекс: {context}\nВопрос: {question}"
+                f"Перефразируй: ```{question}```\n\nИстория диалога: ```{context}```"
             )
+        elif system_prompt == SUMARIZE_SYSTEM_PROMPT:
+            user_query = f"Контекс: ```{context}```\n Мой вопрос: {question}"
         elif system_prompt == AGGREGATE_SYSTEM_PROMPT:
-            user_query = f"Учитывая свои прошлые ответы по частям, ответь на вопрос: {question}\Ответы по частям: \n{context}\nАгрегированный ответ на вопрос: "
+            user_query = f"Ответь на вопрос: {question}\n Контекст: {context}"
         else:
             user_query = question
         return user_query
