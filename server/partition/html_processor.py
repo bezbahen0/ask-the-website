@@ -40,16 +40,20 @@ class HTMLProcessor:
             return res
         return self.html2text.handle(html_content)
 
-    def _prepare_html_tag(self, html_tag):
+    def _prepare_html_tag(self, html_tag, only_visual_tags, tag_attributes):
         html_tag = BeautifulSoup(html_tag, "html.parser")
         for tag in html_tag.find_all(True):
-            if tag.name in ["style", "script", "svg"]:
-                tag.decompose()
-                continue
-            
-            if tag.attrs:
-                attrs_to_keep = ['href', "id", "class"]
-                tag.attrs = {attr: value for attr, value in tag.attrs.items() if attr in attrs_to_keep}
+            if only_visual_tags:
+                if tag.name in ["style", "script", "svg"]:
+                    tag.decompose()
+                    continue
+            else: 
+                if tag.name not in ["style", "script", "svg"]:
+                    tag.decompose()
+                    continue
+
+            if not tag_attributes:
+                tag.attrs = {}
         return str(html_tag)
 
     def _find_parent_path(self, tag):
@@ -111,23 +115,24 @@ class HTMLProcessor:
         }
         return page_meta
 
-    def _process_body(self, html_body, page_url, split=True, context_len_checker=None):
-        html_content = self._prepare_html_tag(str(html_body))
+    def _process_body(self, html_body, page_url, only_visual_tags, tag_attributes, context_len_checker=None):
+        html_content = self._prepare_html_tag(str(html_body), only_visual_tags, tag_attributes)
         page_meta = None
-        if split:
+        print(html_content)
+        if context_len_checker(html_content):
             html_body = BeautifulSoup(
                 str(html_content).replace("\\n", ""), "html.parser"
             )
             docs = self._split_tags_tree(html_body, context_len_checker)
-            docs.sort(key=lambda x: context_len_checker(x, return_len=True), reverse=True)
-            docs = self._concatenate_small_docs(docs, context_len_checker)
+            # ocs.sort(key=lambda x: context_len_checker(x, return_len=True), reverse=True)
+            # docs = self._concatenate_small_docs(docs, context_len_checker)
             docs = [d.strip() for d in docs if d.strip()]
             return docs, page_meta
 
         return [html_content], page_meta
 
     def process_page(
-        self, html_content, page_url, split_to_chunks=True, context_len_checker=None
+        self, html_content, page_url, only_visual_tags=True, tag_attributes=True, context_len_checker=None
     ):
         content = BeautifulSoup(html_content, "html.parser")
 
@@ -148,7 +153,8 @@ class HTMLProcessor:
         documents, body_page_meta = self._process_body(
             self.body,
             page_url,
-            split=split_to_chunks,
+            only_visual_tags=only_visual_tags,
+            tag_attributes=tag_attributes,
             context_len_checker=context_len_checker,
         )
         # page_meta.update(body_page_meta)

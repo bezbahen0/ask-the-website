@@ -50,13 +50,23 @@ class LlamaCppWrapper:
     def tokenize(self, text):
         return self.model.tokenize(text.encode("utf8"))
 
-    def generate(self, template, stream=False):
-        response_generator = self.model.create_chat_completion(
-            template,
-            stream=stream,
-            max_tokens=self.max_new_tokens,
-            temperature=self.temperature,
-        )
+    def generate(self, template, stream=False, schema=None):
+        if schema:
+            response_generator = self.model.create_chat_completion(
+                template,
+                stream=stream,
+                max_tokens=self.max_new_tokens,
+                temperature=self.temperature,
+                response_format={"type": "json_object", "schema": schema},
+            )
+        else:
+            response_generator = self.model.create_chat_completion(
+                template,
+                stream=stream,
+                max_tokens=self.max_new_tokens,
+                temperature=self.temperature,
+            )
+
         if stream:
 
             def generate():

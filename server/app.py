@@ -23,15 +23,30 @@ app.add_middleware(
 dialogue_manager = DialogManager()
 
 
+class Model(BaseModel):
+    model: str
+
+
+class Chat(BaseModel):
+    chat_id: str
+
+
+class Query(BaseModel):
+    chat_id: str
+    query: str
+    page_content: str
+    page_url: str
+
+
 @app.get("/get_chat_id")
 async def get_new_chat_id():
     return {"new_chat_id" : dialogue_manager.get_chat_id()}
 
 
 @app.post("/get_chat_messages")
-async def get_chat_messages(chat_id: dict):
-    print(chat_id["chat_id"])
-    return {"dialog": dialogue_manager.get_chat_messages(chat_id=chat_id["chat_id"])}
+async def get_chat_messages(chat: Chat):
+    print(chat.chat_id)
+    return {"dialog": dialogue_manager.get_chat_messages(chat_id=chat.chat_id)}
 
 
 @app.get("/get_current_model")
@@ -40,10 +55,10 @@ async def get_current_model():
 
 
 @app.post("/load_model")
-async def load_model(model: dict):
+async def load_model(model: Model):
     print(model)
 
-    dialogue_manager.change_dialog_model(model_name=model["model"])
+    dialogue_manager.change_dialog_model(model_name=model.model)
 
     return {"status": "Model loaded successfully"}
 
@@ -54,12 +69,12 @@ async def get_gguf_files():
 
 
 @app.post("/query")
-async def handle_query(query: dict):
+async def handle_query(query: Query):
     response_from_model = dialogue_manager.add_chat_query(
-        query["chat_id"],
-        query["query"],
-        query["page_content"],
-        query["page_url"],
+        query.chat_id,
+        query.query,
+        query.page_content,
+        query.page_url,
     )
     return StreamingResponse(response_from_model, media_type="text/plain")
 
