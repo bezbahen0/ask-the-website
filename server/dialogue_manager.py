@@ -24,7 +24,7 @@ class DialogManager:
         self,
         temperature=0.0,
         max_new_tokens=2048,
-        max_context_size=16000,
+        max_context_size=15000,
         max_prompt_size=2000,
         repeat_penalty=1.1,
         top_k=30,
@@ -38,18 +38,14 @@ class DialogManager:
         self.max_new_tokens = max_new_tokens
         self.max_prompt_size = max_prompt_size
         self.max_context_size = max_context_size
+        self.max_model_input_tokens = (
+            max_new_tokens + max_context_size + max_prompt_size
+        )
         self.top_k = top_k
         self.top_p = top_p
+        self.repeat_penalty = repeat_penalty
 
-        self.llm_client = self.get_llm_client(
-            temperature,
-            repeat_penalty,
-            top_k,
-            top_p,
-            max_new_tokens,
-            max_context_size,
-            max_prompt_size,
-        )
+        self.llm_client = self.get_llm_client()
 
         self.agent = HTMLAgent(llm_client=self.llm_client)
 
@@ -145,26 +141,17 @@ class DialogManager:
     def get_current_model(self):
         return self.model_name
 
-    def get_llm_client(
-        self,
-        temperature,
-        repeat_penalty,
-        top_k,
-        top_p,
-        max_new_tokens,
-        max_context_size,
-        max_prompt_size,
-    ):
+    def get_llm_client(self):
         if INFERENCE_TYPE == "llama.cpp":
             return LlamaCppWrapper(
                 model_path=self.model_path,
-                temperature=temperature,
-                repeat_penalty=repeat_penalty,
-                max_tokens=max_new_tokens + max_context_size,
-                n_ctx=max_context_size,
-                top_k=top_k,
-                top_p=top_p,
-                max_prompt_size=max_prompt_size,
+                temperature=self.temperature,
+                repeat_penalty=self.repeat_penalty,
+                max_tokens=self.max_model_input_tokens,
+                n_ctx=self.max_context_size,
+                top_k=self.top_k,
+                top_p=self.top_p,
+                max_prompt_size=self.max_prompt_size,
             )
         else:
             raise NotImplementedError

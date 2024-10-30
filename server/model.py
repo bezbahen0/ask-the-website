@@ -18,7 +18,7 @@ class LlamaCppWrapper:
     ):
         self.model = Llama(
             model_path=model_path,
-            n_ctx=n_ctx,
+            n_ctx=max_tokens,
             top_k=top_k,
             top_p=top_p,
             temperature=temperature,
@@ -81,6 +81,6 @@ class LlamaCppWrapper:
         if return_len:
             return context_len
 
-        if context_len > self.n_ctx - self.max_prompt_size:
+        if context_len > self.n_ctx:
             return False
         return True
