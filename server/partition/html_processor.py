@@ -47,7 +47,7 @@ class HTMLProcessor:
                 if tag.name in ["style", "script", "svg"]:
                     tag.decompose()
                     continue
-            else: 
+            else:
                 if tag.name not in ["style", "script", "svg"]:
                     tag.decompose()
                     continue
@@ -87,27 +87,6 @@ class HTMLProcessor:
 
         return result
 
-    def _concatenate_small_docs(self, docs, context_len_checker):
-        concatenated_docs = []
-        current_doc = ""
-
-        for doc in docs:
-            if current_doc:
-                combined_doc = current_doc + " " + doc
-            else:
-                combined_doc = doc
-
-            if context_len_checker(combined_doc):
-                current_doc = combined_doc
-            else:
-                concatenated_docs.append(current_doc)
-                current_doc = doc
-
-        if current_doc:
-            concatenated_docs.append(current_doc)
-
-        return concatenated_docs
-
     def _process_head(self, html_head):
         content = BeautifulSoup(html_head, "html.parser")
         page_meta = {
@@ -115,24 +94,58 @@ class HTMLProcessor:
         }
         return page_meta
 
-    def _process_body(self, html_body, page_url, only_visual_tags, tag_attributes, context_len_checker=None):
-        html_content = self._prepare_html_tag(str(html_body), only_visual_tags, tag_attributes)
+    def _process_body(
+        self,
+        html_body,
+        page_url,
+        split,
+        only_visual_tags,
+        tag_attributes,
+        context_len_checker=None,
+    ):
+        html_content = self._prepare_html_tag(
+            str(html_body), only_visual_tags, tag_attributes
+        )
         page_meta = None
-        print(html_content)
-        if context_len_checker(html_content):
+
+        if split:
             html_body = BeautifulSoup(
                 str(html_content).replace("\\n", ""), "html.parser"
             )
+
             docs = self._split_tags_tree(html_body, context_len_checker)
-            # ocs.sort(key=lambda x: context_len_checker(x, return_len=True), reverse=True)
-            # docs = self._concatenate_small_docs(docs, context_len_checker)
             docs = [d.strip() for d in docs if d.strip()]
             return docs, page_meta
 
         return [html_content], page_meta
 
+    def make_page(self, html_tags_list, current_iter, old_responses_list):
+        root_tag = BeautifulSoup("<body></body>", "html.parser")
+        body = root_tag.body
+
+        for i, tag_string in enumerate(html_tags_list):
+            tag = BeautifulSoup(tag_string, "html.parser").contents[0]
+
+            if i > current_iter:
+                tag.clear()
+                tag.string = "MASKED: Will be shown later"
+            elif i < current_iter:
+                tag.clear()
+                tag.string = f"This part of the html has already been viewed, here is the answer for it: \n{old_responses_list[i]}"
+
+            body.append(tag)
+            body.append("\n\n")
+
+        return root_tag.prettify()
+
     def process_page(
-        self, html_content, page_url, only_visual_tags=True, tag_attributes=True, context_len_checker=None
+        self,
+        html_content,
+        page_url,
+        split=False,
+        only_visual_tags=True,
+        tag_attributes=True,
+        context_len_checker=None,
     ):
         content = BeautifulSoup(html_content, "html.parser")
 
@@ -153,9 +166,10 @@ class HTMLProcessor:
         documents, body_page_meta = self._process_body(
             self.body,
             page_url,
+            split=split,
             only_visual_tags=only_visual_tags,
             tag_attributes=tag_attributes,
             context_len_checker=context_len_checker,
         )
         # page_meta.update(body_page_meta)
-        return documents, page_meta
+        return documents, body_page_meta

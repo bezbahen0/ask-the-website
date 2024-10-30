@@ -14,7 +14,8 @@ LLM_MODEL = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
 class DialogRoadmap(BaseModel):
-    user_input_explanation_what_he_want: str
+    brief_description_of_the_entire_dialogue: str
+    current_dialog_iteration_user_input_explanation_what_he_want: str
     it_a_question_about_website_content: bool
 
 
@@ -23,8 +24,8 @@ class DialogManager:
         self,
         temperature=0.0,
         max_new_tokens=2048,
-        max_context_size=20000,
-        max_prompt_size=3000,
+        max_context_size=16000,
+        max_prompt_size=2000,
         repeat_penalty=1.1,
         top_k=30,
         top_p=1.0,
@@ -64,7 +65,7 @@ class DialogManager:
             message=user_query,
             model_name="",
             service_comments="",
-            version="0.3.0",
+            version="0.3.1",
         )
 
         dialog_history = "\n".join([f"{d.role} - {d.message}" for d in chat_history])
@@ -74,7 +75,7 @@ class DialogManager:
             template=[
                 {
                     "role": "user",
-                    "content": f"What does the user want at the current iteration of the dialogue? Give answer from first view. Иut remember, the user is most likely asking a question about the content, unless the user explicitly states that this is not the case or simply says hello, then only in this case it does not require context. Current user query to bot: ```{user_query}``` All dialog: ```{dialog_history}```",
+                    "content": f"What does the user want at the current iteration of the dialogue? Give answer from first view. But remember, the user is most likely asking a question about the content, unless the user explicitly states that this is not answer on webpage, context or simply says hello and wanna just chitchat, then only in this cases it does not require context. Current user query to bot: ```{user_query}``` All dialog: ```{dialog_history}```",
                 },
             ],
             stream=False,
@@ -112,7 +113,7 @@ class DialogManager:
             message=complete_response,
             model_name=self.model_name,
             service_comments=f"{self.agent.client.get_params()}",
-            version="0.3.0",
+            version="0.3.1",
         )
 
     def from_chat_to_llm_tempalte(self, dialog_history):
