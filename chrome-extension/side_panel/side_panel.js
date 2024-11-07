@@ -90,12 +90,13 @@ document.addEventListener('DOMContentLoaded', function () {
             const messages = await get_messages(last_chat_id);
             console.log("messages:", messages);
             if (messages) {
-                console.log("hui")
                 for (const entry of messages) {
                     if ("user" in entry) {
-                        resultDiv.innerHTML += `<div class="user">You said: ${entry.user}</div>`;
+                        text = processMessage(entry.user)
+                        resultDiv.innerHTML += `<div class="user">You said: ${text}</div>`;
                     }
                     else {
+                        text = processMessage(entry.bot)
                         resultDiv.innerHTML += `<div class="bot">Response: ${entry.bot}</div>`;
                     }
                 }
@@ -507,16 +508,9 @@ document.addEventListener('DOMContentLoaded', function () {
             });
     }
 
-    function updateUI(text, incompleted) {
-        // Remove any existing bot response
-        if (incompleted) {
-            const existingBotResponse = resultDiv.querySelector('.bot-stream');
-            if (existingBotResponse) {
-                existingBotResponse.parentNode.removeChild(existingBotResponse);
-            }
-        }
+    function processMessage(text) {
 
-        // Process the text (similar to what you did in the original code)
+
         text = text.replace(/(?:\r\n|\r|\n)/g, '<br>');
         text = text.replace(/\. \*/g, '\n');
         text = text.replace(/\. \d/g, '\n');
@@ -528,6 +522,19 @@ document.addEventListener('DOMContentLoaded', function () {
             text = text.replace(/```javascript/g, '```');
             text = text.replace(/```(.*?)```/g, '<div class="code"><pre>$1</pre><div id="copyCode">copy</div></div>');
         }
+        return text
+    }
+
+
+    function updateUI(text, incompleted) {
+        // Remove any existing bot response
+        if (incompleted) {
+            const existingBotResponse = resultDiv.querySelector('.bot-stream');
+            if (existingBotResponse) {
+                existingBotResponse.parentNode.removeChild(existingBotResponse);
+            }
+        }
+        text = processMessage(text)
         if (incompleted) {
             resultDiv.innerHTML += `<div class="bot-stream">Response: ${text}</div>`;
         }

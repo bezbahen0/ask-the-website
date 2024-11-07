@@ -69,9 +69,7 @@ class HTMLAgent:
                 relevant_chunks.append(response)
                 print(doc)
             messages = (
-                [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                ]
+                
                 + messages
                 + [
                     {
@@ -94,7 +92,7 @@ class HTMLAgent:
             response_from_model = self.client.generate(messages, stream=True)
         return response_from_model
 
-    def generate_chat_response(self, dialog_history, relevant_chunks_responses):
+    def generate_chat_response(self, dialog_history):
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         for conv in dialog_history:
             if conv.role == "user":
