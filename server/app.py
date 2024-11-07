@@ -31,11 +31,20 @@ class Chat(BaseModel):
     chat_id: str
 
 
+class ProcessingSettings(BaseModel):
+    use_page_context: bool
+    tag_attributes: bool
+    body: bool
+    head: bool
+    scripts: bool
+
+
 class Query(BaseModel):
     chat_id: str
     query: str
     page_content: str
     page_url: str
+    processing_settings: ProcessingSettings
 
 
 @app.get("/get_chat_id")
@@ -75,6 +84,7 @@ async def handle_query(query: Query):
         query.query,
         query.page_content,
         query.page_url,
+        query.processing_settings,
     )
     return StreamingResponse(response_from_model, media_type="text/plain")
 

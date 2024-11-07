@@ -13,10 +13,36 @@
             <h2>Local Llama</h2>
             <div id="result"></div>
             <input type="text" id="queryInput" placeholder="Enter your query">
-            <div id="controls-wrapper">
-                <button id="submitButton">Submit</button>
-                <button id="selectTagButton">Select Tag</button>
-                <button id="settingMenuBtn">Settings</button>
+            <div class="main-controls-container">
+                <div class="buttons-column">
+                    <button id="submitButton">Submit</button>
+                    <button id="selectTagButton">Select Tag</button>
+                    <button id="settingMenuBtn">Settings</button>
+                </div>
+                <div class="context-controls">
+                    <label>
+                        <input type="checkbox" id="usePageContext">
+                        Use Page Context
+                    </label>
+                    <div id="contextOptions" style="display: none;">
+                        <label>
+                            <input type="checkbox" id="useTagAttributes">
+                            Tag Attributes
+                        </label>
+                        <label>
+                            <input type="checkbox" id="useBodyTag">
+                            Body
+                        </label>
+                        <label>
+                            <input type="checkbox" id="useHeadTag">
+                            Head
+                        </label>
+                        <label>
+                            <input type="checkbox" id="useScriptTag">
+                            Scripts
+                        </label>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="settings-wrapper">

@@ -12,16 +12,6 @@ HTML-контент может быть сложным, там могут быт
 Ты можешь дать ответ только на одной странице за раз, если тебе нужно еще раз увидеть прошлую страницу, чтобы дать ответ, скажи мне об этом."""
 
 
-class HtmlRetrievalFormat(BaseModel):
-    is_user_query_required_visual_elements_or_functional: Literal[
-        "visual elements", "functional elements of the web page"
-    ]
-    the_user_query_implies_a_search_of_the_main_content_of_the_page: bool
-    are_tag_attributes_required_to_answer_the_user_query: Literal[
-        "to answer user query need tag attributes", "tag attributes are not needed"
-    ]
-
-
 class HTMLAgent:
     def __init__(
         self,
@@ -33,7 +23,7 @@ class HTMLAgent:
 
         self.content_processor = get_processor()
 
-    def get_relevant_info(self, question, dialog_history, context, url):
+    def get_relevant_info(self, question, dialog_history, context, url, processing_settings):
         messages = [
             {
                 "role": "user" if conv.role == "user" else "assistant",
@@ -42,40 +32,14 @@ class HTMLAgent:
             for conv in dialog_history
         ]
 
-        retrieval_request = messages + [
-            {
-                "role": "user",
-                "content": f"I need you to think about a user query and create a configuration for a web page for me to satisfy that query. User query ```{question}```",
-            },
-        ]
-
-        response = self.client.generate(
-            retrieval_request,
-            schema=HtmlRetrievalFormat.model_json_schema(),
-            stream=False,
-        )
-        html_processor_config = HtmlRetrievalFormat.model_validate_json(response)
-        print("\n\n RESPONSE \n\n")
-        print(response)
-
         print(f"page_url: {url}")
-
-        tag_attributes = (
-            False
-            if html_processor_config.are_tag_attributes_required_to_answer_the_user_query
-            == "tag attributes are not needed"
-            else True
-        )
-        tag_attributes = True
-        only_visual_tags = True
 
         self.content_processor = get_processor(page_type="html")
         documents, page_meta = self.content_processor.process_page(
             context,
             url,
             split=False,
-            tag_attributes=tag_attributes,
-            only_visual_tags=only_visual_tags,
+            processing_settings=processing_settings,
             context_len_checker=self.client.check_context_len,
         )
 
@@ -84,8 +48,7 @@ class HTMLAgent:
                 context,
                 url,
                 split=True,
-                tag_attributes=tag_attributes,
-                only_visual_tags=only_visual_tags,
+                processing_settings=processing_settings,
                 context_len_checker=self.client.check_context_len,
             )
             print(f"Find {len(documents)} chunks")
@@ -104,7 +67,7 @@ class HTMLAgent:
 
                 response = self.client.generate(messages_parting, stream=False)
                 relevant_chunks.append(response)
-
+                print(doc)
             messages = (
                 [
                     {"role": "system", "content": SYSTEM_PROMPT},

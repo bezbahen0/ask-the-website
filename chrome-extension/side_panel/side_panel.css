@@ -413,3 +413,36 @@ pre {
     right: 0;
     top: 0;
 }
+
+.main-controls-container {
+    display: flex;
+    gap: 10px;
+    margin: 5px;
+    padding: 5px;
+    background-color: rgb(53, 53, 53);
+}
+
+.buttons-column {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 120px;
+}
+
+.context-controls {
+    flex-grow: 1;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    color: white;
+}
+
+.context-controls label {
+    color: white;
+    font-size: 13px;
+}
+
+#contextOptions {
+    margin-left: 15px;
+    margin-top: 5px;
+}

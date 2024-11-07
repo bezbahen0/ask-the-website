@@ -13,12 +13,6 @@ LLM_PATH = "models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 LLM_MODEL = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
-class DialogRoadmap(BaseModel):
-    brief_description_of_the_entire_dialogue: str
-    current_dialog_iteration_user_input_explanation_what_he_want: str
-    it_a_question_about_website_content: bool
-
-
 class DialogManager:
     def __init__(
         self,
@@ -49,7 +43,15 @@ class DialogManager:
 
         self.agent = HTMLAgent(llm_client=self.llm_client)
 
-    def add_chat_query(self, chat_id, user_query, page_content, url, file_type="html"):
+    def add_chat_query(
+        self,
+        chat_id,
+        user_query,
+        page_content,
+        url,
+        processing_settings,
+        file_type="html",
+    ):
         chat_history = get_chat_messages(chat_id=chat_id)
 
         add_message(
@@ -64,30 +66,18 @@ class DialogManager:
             version="0.3.1",
         )
 
-        dialog_history = "\n".join([f"{d.role} - {d.message}" for d in chat_history])
-
-        dialog_roadmap = self.llm_client.generate(
-            schema=DialogRoadmap.model_json_schema(),
-            template=[
-                {
-                    "role": "user",
-                    "content": f"What does the user want at the current iteration of the dialogue? Give answer from first view. But remember, the user is most likely asking a question about the content, unless the user explicitly states that this is not answer on webpage, context or simply says hello and wanna just chitchat, then only in this cases it does not require context. Current user query to bot: ```{user_query}``` All dialog: ```{dialog_history}```",
-                },
-            ],
-            stream=False,
-        )
-        dialog_roadmap = DialogRoadmap.model_validate_json(dialog_roadmap)
         print("\n".join([f"{d.role} - {d.message}" for d in chat_history]))
         print(user_query)
-        print(dialog_roadmap)
+        print(processing_settings)
 
-        if dialog_roadmap.it_a_question_about_website_content:
+        if processing_settings.use_page_context:
             bot_response = self.agent.get_relevant_info(
                 # dialog_roadmap.user_input_explanation_what_he_want, page_content, url
                 user_query,
                 chat_history,
                 page_content,
                 url,
+                processing_settings,
             )
         else:
             bot_response = self.agent.generate_chat_response(
@@ -100,6 +90,11 @@ class DialogManager:
             complete_response += chunk
             yield chunk
 
+        params = {
+            "llm_params": self.agent.client.get_params(),
+            "processing_settings": processing_settings.json(),
+        }
+
         add_message(
             1,
             chat_id=chat_id,
@@ -108,7 +103,7 @@ class DialogManager:
             role="bot",
             message=complete_response,
             model_name=self.model_name,
-            service_comments=f"{self.agent.client.get_params()}",
+            service_comments=str(params),
             version="0.3.1",
         )
 

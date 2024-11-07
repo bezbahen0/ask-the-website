@@ -1,7 +1,15 @@
 document.addEventListener('DOMContentLoaded', function () {
+    const usePageContext = document.getElementById('usePageContext');
+    const contextOptions = document.getElementById('contextOptions');
+    const useTagAttributes = document.getElementById('useTagAttributes');
+    const useBodyTag = document.getElementById('useBodyTag');
+    const useHeadTag = document.getElementById('useHeadTag');
+    const useScriptTag = document.getElementById('useScriptTag');
+
     const queryInput = document.getElementById('queryInput');
     const submitButton = document.getElementById('submitButton');
     const selectTagButton = document.getElementById('selectTagButton');
+
     const resultDiv = document.getElementById('result');
     const serverCheckButton = document.getElementById('serverCheck');
     const creatorWindow = document.getElementById('creator-wrapper');
@@ -15,13 +23,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const serverPort = document.getElementById('serverPort');
     //   const serverStart = document.getElementById('serverStart');
 
-    var creatorContentOpen = false;
-    var helpContentOpen = false;
-    var code_response = null;
-
     var ip = '127.0.0.1';
     var port = '8080';
     var url = 'http://' + ip + ':' + port + '/';
+    var useContext = false;
 
     function set_value_of_ip_and_port() {
         serverIP.value = ip;
@@ -38,6 +43,11 @@ document.addEventListener('DOMContentLoaded', function () {
         port = serverPort.value;
         url = 'http://' + ip + ':' + port + '/';
         console.log(url)
+    });
+
+    usePageContext.addEventListener('change', function () {
+        contextOptions.style.display = this.checked ? 'block' : 'none';
+        useContext = this.checked
     });
 
 
@@ -380,17 +390,18 @@ document.addEventListener('DOMContentLoaded', function () {
     submitButton.addEventListener('click', function () {
         const query = queryInput.value;
         const chat_id = localStorage.getItem("chat_id")
+        const context_params = get_context_params()
 
         chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
             chrome.tabs.sendMessage(tabs[0].id, { action: "getSelectedHMTL" }, function (response) {
                 if (response.selected !== "") {
                     console.log('Sending selected HTML instead of page content');
                     checkInspectorStatus()
-                    sendRequest(query, chat_id, tabs[0].url, response.selected);
+                    sendRequest(query, chat_id, tabs[0].url, response.selected, context_params);
                 } else {
                     console.log('Sending full page content');
                     getPageContent((pageData) => {
-                        sendRequest(query, chat_id, pageData.url, pageData.content);
+                        sendRequest(query, chat_id, pageData.url, pageData.content, context_params);
                     });
                 }
 
@@ -401,8 +412,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    function get_context_params() {
+        const usePageContextParam = useContext;
+        const useTagAttributesParam = useTagAttributes.checked;
+        const useBodyTagParam = useBodyTag.checked;
+        const useHeadTagParam = useHeadTag.checked;
+        const useScriptTagParam = useScriptTag.checked;
 
-    function sendRequest(query, chat_id, pageUrl, pageContent) {
+        return {
+            use_page_context: usePageContextParam,
+            tag_attributes: useTagAttributesParam,
+            body: useBodyTagParam,
+            head: useHeadTagParam,
+            scripts: useScriptTagParam,
+        }
+    }
+
+
+    function sendRequest(query, chat_id, pageUrl, pageContent, context_params) {
         const req_url = 'http://' + ip + ':' + port + '/query';
         let accumulatedResponse = ''; // Declare accumulatedResponse in the outer scope
         let isStreamEnded = false; // Flag to track if the stream has ended
@@ -412,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function () {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ query, chat_id: chat_id, page_url: pageUrl, page_content: pageContent }),
+            body: JSON.stringify({ query, chat_id: chat_id, page_url: pageUrl, page_content: pageContent, processing_settings: context_params }),
         })
             .then(response => {
                 if (!response.ok) {

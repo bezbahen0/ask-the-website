@@ -47,13 +47,11 @@ class HTMLProcessor:
                 if tag.name in ["style", "script", "svg"]:
                     tag.decompose()
                     continue
-            else:
-                if tag.name not in ["style", "script", "svg"]:
-                    tag.decompose()
-                    continue
-
+            
             if not tag_attributes:
-                tag.attrs = {}
+                if tag.attrs:
+                    attrs_to_keep = ['href']
+                    tag.attrs = {attr: value for attr, value in tag.attrs.items() if attr in attrs_to_keep}
         return str(html_tag)
 
     def _find_parent_path(self, tag):
@@ -142,33 +140,34 @@ class HTMLProcessor:
         self,
         html_content,
         page_url,
+        processing_settings,
         split=False,
-        only_visual_tags=True,
-        tag_attributes=True,
         context_len_checker=None,
     ):
         content = BeautifulSoup(html_content, "html.parser")
 
-        self.body = content.find("body")
-        if not self.body:
-            self.body = content
+        if processing_settings.body:
+            self.body = content.find("body")
+            if not self.body:
+                self.body = content
 
-        head = content.find("head")
+        if processing_settings.head:
+            head = content.find("head")
 
-        if head:
-            page_meta = self._process_head(str(head))
-            page_meta["url"] = page_url
-            if "lang" in content.html:
-                page_meta["language"] = content.html["lang"]
-        else:
-            page_meta = {}
+            if head:
+                page_meta = self._process_head(str(head))
+                page_meta["url"] = page_url
+                if "lang" in content.html:
+                    page_meta["language"] = content.html["lang"]
+            else:
+                page_meta = {}
 
         documents, body_page_meta = self._process_body(
             self.body,
             page_url,
             split=split,
-            only_visual_tags=only_visual_tags,
-            tag_attributes=tag_attributes,
+            tag_attributes=processing_settings.tag_attributes,
+            only_visual_tags=not processing_settings.scripts,
             context_len_checker=context_len_checker,
         )
         # page_meta.update(body_page_meta)
