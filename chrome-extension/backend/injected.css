@@ -4,8 +4,8 @@ The styling rules injected into the current window / tab.
 
 .highlighted {
   transition: 10ms all ease-in-out;
-  outline: 2px red solid;
-  background: rgba(255, 0, 0, 0.096);
+  outline: 2px rgb(115, 255, 0) solid;
+  background: rgba(127, 255, 170, 0.856);
   cursor: crosshair !important;
 }
 
