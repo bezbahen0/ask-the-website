@@ -63,7 +63,7 @@ class DialogManager:
             message=user_query,
             model_name="",
             service_comments="",
-            version="0.3.1",
+            version="0.3.3",
         )
 
         print("\n".join([f"{d.role} - {d.message}" for d in chat_history]))
@@ -104,7 +104,7 @@ class DialogManager:
             message=complete_response,
             model_name=self.model_name,
             service_comments=str(params),
-            version="0.3.1",
+            version="0.3.3",
         )
 
     def from_chat_to_llm_tempalte(self, dialog_history):
