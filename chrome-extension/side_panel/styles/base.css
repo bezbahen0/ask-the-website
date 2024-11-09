@@ -1,0 +1,32 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100&display=swap");
+
+:root {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    font-family: "Poppins", sans-serif;
+    color: white;
+    background-color: rgb(53, 53, 53);
+}
+
+body {
+    overflow-y: auto;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+h2 {
+    font-size: 1.5rem;
+    font-weight: 100;
+    margin: 0px 0px 0px 5px;
+    padding: 0;
+}
+
+pre {
+    padding: 0;
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}

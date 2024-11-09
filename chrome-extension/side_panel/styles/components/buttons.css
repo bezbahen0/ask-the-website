@@ -1,0 +1,46 @@
+#submitButton,
+#selectTagButton,
+#settingMenuBtn {
+    background-color: rgb(4, 249, 4);
+    border: 1px solid grey;
+    border-radius: 5px;
+    margin: 0px;
+    padding: 5px;
+    color: Black;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    outline: none;
+}
+
+#selectTagButton.active {
+    background-color: red;
+}
+
+#ClearConvo {
+    position: absolute;
+    right: 0;
+    background-color: rgb(249, 114, 4);
+    border: 1px solid grey;
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    color: Black;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    outline: none;
+}
+
+#serverCheck {
+    background-color: rgba(4, 241, 249, 0.795);
+    border: 1px solid grey;
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    color: black;
+    font-size: 12px;
+    font-weight: 100;
+    cursor: pointer;
+    outline: none;
+}

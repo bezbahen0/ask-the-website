@@ -1,0 +1,25 @@
+.code {
+    position: relative;
+    background-color: #000000;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 14px;
+    color: #1eff00;
+    word-wrap: wrap;
+}
+
+#copyCode {
+    position: absolute;
+    right: -5px;
+    top: -5px;
+    border: 1px solid grey;
+    border-radius: 5px;
+    cursor: crosshair;
+    background-color: #000000;
+}
+
+#copyCode:hover {
+    scale: 1.1;
+}

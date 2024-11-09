@@ -32,7 +32,7 @@
         "<all_urls>"
       ],
       "css": [
-        "backend/injected.css"
+        "side_panel/styles/components/injected.css"
       ],
       "js": [
         "backend/content.js",
@@ -40,9 +40,7 @@
       ]
     }
   ],
-  //"background": {
-  //  "service_worker": "backend/background.js"
-  //},
+
   "offline_enabled": true,
   "permissions": [
     "contextMenus",

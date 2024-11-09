@@ -1,0 +1,52 @@
+.loading {
+    background-color: rgb(70, 1, 182);
+    border: 1px solid grey;
+    border-radius: 5px;
+    margin: 5px;
+    padding: 5px;
+    flex: 1;
+    animation: hueshift 5s infinite;
+    width: fit-content;
+}
+
+@keyframes hueshift {
+    0% {
+        background-color: hsl(0, 100%, 50%);
+        color: hsl(120, 100%, 50%);
+    }
+
+    14.29% {
+        background-color: hsl(30, 100%, 50%);
+        color: hsl(180, 100%, 50%);
+    }
+
+    28.57% {
+        background-color: hsl(60, 100%, 50%);
+        color: hsl(240, 100%, 50%);
+    }
+
+    42.86% {
+        background-color: hsl(120, 100%, 50%);
+        color: hsl(270, 100%, 50%);
+    }
+
+    57.14% {
+        background-color: hsl(180, 100%, 50%);
+        color: hsl(300, 100%, 50%);
+    }
+
+    71.43% {
+        background-color: hsl(240, 100%, 50%);
+        color: hsl(0, 100%, 50%);
+    }
+
+    85.71% {
+        background-color: hsl(270, 100%, 50%);
+        color: hsl(30, 100%, 50%);
+    }
+
+    100% {
+        background-color: hsl(300, 100%, 50%);
+        color: hsl(60, 100%, 50%);
+    }
+}
