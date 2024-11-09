@@ -60,7 +60,6 @@ class App {
                 pageContent: pageContent.content,
                 contextParams
             });
-            this.chat.displayMessage(response, 'bot');
         } catch (error) {
             console.error('Error sending message:', error);
             this.chat.displayError('Failed to send message');
@@ -95,13 +94,23 @@ class App {
         const decoder = new TextDecoder();
         let accumulatedResponse = '';
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value, { stream: true });
-            accumulatedResponse += chunk;
-            this.chat.updateStreamingResponse(accumulatedResponse);
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                    this.chat.updateStreamingResponse(accumulatedResponse, true);
+                    break;
+                }
+                
+                const chunk = decoder.decode(value, { stream: true });
+                accumulatedResponse += chunk;
+                
+                this.chat.updateStreamingResponse(accumulatedResponse, false);
+            }
+        } catch (error) {
+            console.error('Error in stream processing:', error);
+            this.chat.displayError('Error in stream processing');
         }
 
         return accumulatedResponse;

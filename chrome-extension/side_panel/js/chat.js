@@ -102,18 +102,22 @@ export class Chat {
         this.scrollToBottom();
     }
 
-    updateStreamingResponse(text) {
+    updateStreamingResponse(text, isComplete = false) {
         this.removeLoading();
         
         if (!this.currentStreamingDiv) {
             this.currentStreamingDiv = document.createElement('div');
-            this.currentStreamingDiv.className = 'bot-stream';
+            this.currentStreamingDiv.className = 'bot';
             this.resultDiv.appendChild(this.currentStreamingDiv);
         }
 
         const processedText = ContentManager.processMessage(text);
         this.currentStreamingDiv.innerHTML = `Response: ${processedText}`;
         this.scrollToBottom();
+
+        if (isComplete) {
+            this.finalizeStreamingResponse();
+        }
     }
 
     finalizeStreamingResponse() {
