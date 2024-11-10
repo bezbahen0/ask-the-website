@@ -52,7 +52,16 @@ class App {
 
     async handleMessageSend({ query, chatId, contextParams }) {
         try {
-            const pageContent = this.state.selectedContent || await ContentManager.getPageContent();
+            let pageContent;
+        
+            if (this.state.selectedContent) {
+                pageContent = this.state.selectedContent;
+            } else {
+                pageContent = await ContentManager.getPageContent();
+            }
+    
+            console.log(pageContent)
+
             const response = await this.sendRequest({
                 query,
                 chatId,
@@ -97,15 +106,15 @@ class App {
         try {
             while (true) {
                 const { done, value } = await reader.read();
-                
+
                 if (done) {
                     this.chat.updateStreamingResponse(accumulatedResponse, true);
                     break;
                 }
-                
+
                 const chunk = decoder.decode(value, { stream: true });
                 accumulatedResponse += chunk;
-                
+
                 this.chat.updateStreamingResponse(accumulatedResponse, false);
             }
         } catch (error) {

@@ -12,6 +12,15 @@ export class Inspector {
     bindEvents() {
         this.selectTagButton.addEventListener('click', () => this.toggleInspector());
         this.setupChromeListeners();
+
+        chrome.runtime.onMessage.addListener(async (message, sender, sendResponse) => {
+            if (message.action === "tagSelected") {
+                const selectedContent = await this.getSelectedContent();
+                if (selectedContent) {
+                    this.onSelectionChange(selectedContent);
+                }
+            }
+        });
     }
 
     setupChromeListeners() {
@@ -26,6 +35,23 @@ export class Inspector {
         });
     }
 
+    async getSelectedContent() {
+        return new Promise((resolve) => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                chrome.tabs.sendMessage(tabs[0].id, { action: "getSelectedHMTL" }, (response) => {
+                    if (response && response.selected) {
+                        resolve({
+                            content: response.selected,
+                            url: tabs[0].url
+                        });
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+        });
+    }
+
     toggleInspector() {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
             chrome.tabs.sendMessage(tabs[0].id, { action: "inspectorTrigger" }, (response) => {
@@ -34,6 +60,10 @@ export class Inspector {
                     return;
                 }
                 this.updateButtonState(response.status);
+                
+                if (!response.status) {
+                    this.onSelectionChange(null);
+                }
             });
         });
     }

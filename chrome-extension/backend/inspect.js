@@ -33,15 +33,13 @@ const inspectorTargetClickHandler = (event) => {
     event.stopImmediatePropagation();
 
     selectedHTML = event.target.outerHTML;
-    console.log('Selected element HTML:', selectedHTML); // Debugging log
+    console.log('Selected element HTML:', selectedHTML);
 
-    // Store the outerHTML in chrome.storage
-    //chrome.storage.local.set({"selectedHTML": selectedHTML }, () => {
-    //    console.log('Selected HTML has been stored.');
-    //});
+    // Отправляем сообщение о том, что тег выбран
+    chrome.runtime.sendMessage({ action: "tagSelected" });
 
     removeHighlight(event.target);
-    deactivateInspector(); // Deactivate inspector after selection
+    deactivateInspector();
 };
 
 const inspectorHandler = (event) => {
@@ -93,11 +91,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else if (message.action === "getSelectedHMTL") {
         sendResponse({ selected: selectedHTML });
     } else if (message.action === "isInspectorActive") {
-        if (selectedHTML !== ""){
+        if (selectedHTML !== "") {
             sendResponse({ status: true });
         }
         else {
             sendResponse({ status: inspectorStatus });
         }
+    } else if (message.action === "clearSelectedHTML") {
+        selectedHTML = "";
+        sendResponse({ success: true });
     }
+    return true
 });
