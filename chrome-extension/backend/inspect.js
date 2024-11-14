@@ -18,7 +18,6 @@ const highlight = (target) => {
     inspector_selector.style.top = `${rect.top + window.scrollY + rect.height + 5}px`;
     inspector_selector.style.left = `${rect.left + window.scrollX}px`;
 
-    // Attach the click handler
     target.addEventListener('click', inspectorTargetClickHandler);
 };
 
@@ -35,7 +34,6 @@ const inspectorTargetClickHandler = (event) => {
     selectedHTML = event.target.outerHTML;
     console.log('Selected element HTML:', selectedHTML);
 
-    // Отправляем сообщение о том, что тег выбран
     chrome.runtime.sendMessage({ action: "tagSelected" });
 
     removeHighlight(event.target);
@@ -58,27 +56,22 @@ const inspectorMouseLeaveHandler = (event) => {
     removeHighlight(event.target);
 };
 
-// Inspector activation/deactivation
 const activateInspector = () => {
-    console.log('Inspector activated.'); // Debugging log
+    console.log('Inspector activated.');
     inspectorStatus = true;
     document.addEventListener('mousemove', inspectorHandler);
 };
 
 const deactivateInspector = () => {
-    console.log('Inspector deactivated.'); // Debugging log
+    console.log('Inspector deactivated.');
     inspectorStatus = false;
     document.removeEventListener('mousemove', inspectorHandler);
 };
 
 const cleanInspector = () => {
-    selectedHTML = "";  // Clear selected HTML on deactivation
-    //chrome.storage.local.remove('selectedHTML', () => {
-    //    console.log('Selected HTML cleared from chrome.storage.');
-    //});
+    selectedHTML = "";  
 };
 
-// Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "inspectorTrigger") {
         if (inspectorStatus) {
