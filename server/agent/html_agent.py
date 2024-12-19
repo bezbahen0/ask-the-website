@@ -42,7 +42,7 @@ class HTMLAgent:
         print(f"page_url: {url}")
 
         self.content_processor = get_processor(page_type="text/html")
-        documents, page_meta = self.content_processor.process_page(
+        documents = self.content_processor.process_page(
             context,
             url,
             split=False,
@@ -51,7 +51,7 @@ class HTMLAgent:
         )
 
         if not self.client.check_context_len(text=str(documents)):
-            documents, root_tag = self.content_processor.process_page(
+            documents = self.content_processor.process_page(
                 context,
                 url,
                 split=True,
@@ -64,7 +64,7 @@ class HTMLAgent:
             )
             relevant_chunks = []
             for i, doc in tqdm(enumerate(documents), total=len(documents)):
-                doc = self.content_processor.make_page(documents, i, relevant_chunks)
+                doc = self.content_processor.make_page(documents, i, relevant_chunks, processing_settings)
                 messages_parting = messages + [
                     {
                         "role": "user",
@@ -75,10 +75,10 @@ class HTMLAgent:
                 response = self.client.generate(messages_parting, stream=False)
                 relevant_chunks.append(response)
                 print(doc)
-            messages = +messages + [
+            messages = messages + [
                 {
                     "role": "user",
-                    "content": f"Составь единый ответы из нескольких User query: ```{question}``` \n\n Ответы по разным частям одной web страницы: ```{self.content_processor.make_page(documents, len(documents)-1, relevant_chunks)}```",
+                    "content": f"Составь единый ответы из нескольких User query: ```{question}``` \n\n Ответы по разным частям одной web страницы: ```{self.content_processor.make_page(documents, len(documents)-1, relevant_chunks, processing_settings)}```",
                 },
             ]
             response_from_model = self.client.generate(messages, stream=True)

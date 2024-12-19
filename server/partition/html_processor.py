@@ -3,8 +3,7 @@ import html2text
 from bs4 import BeautifulSoup, NavigableString, Tag, Comment
 from pydantic import BaseModel
 
-# settings class pydantic
-# 
+
 class HTMLProcessingSettings(BaseModel):
     use_only_text: bool 
     use_tag_attributes: bool
@@ -98,24 +97,28 @@ class HTMLProcessor:
 
         return [html_content], page_meta
 
-    def make_page(self, html_tags_list, current_iter, old_responses_list):
-        root_tag = BeautifulSoup("<body></body>", "html.parser")
-        body = root_tag.body
+    def make_page(self, html_tags_list, current_iter, old_responses_list, processing_settings):
 
-        for i, tag_string in enumerate(html_tags_list):
-            tag = BeautifulSoup(tag_string, "html.parser").contents[0]
+        if not processing_settings.use_only_text:
+            root_tag = BeautifulSoup("<body></body>", "html.parser")
+            body = root_tag.body
 
-            if i > current_iter:
-                tag.clear()
-                tag.string = "MASKED: Will be shown later"
-            elif i < current_iter:
-                tag.clear()
-                tag.string = f"This part of the html has already been viewed, here is the answer for it: \n{old_responses_list[i]}"
+            for i, tag_string in enumerate(html_tags_list):
+                tag = BeautifulSoup(tag_string, "html.parser").contents[0]
 
-            body.append(tag)
-            body.append("\n\n")
+                if i > current_iter:
+                    tag.clear()
+                    tag.string = "MASKED: Will be shown later"
+                elif i < current_iter:
+                    tag.clear()
+                    tag.string = f"This part of the html has already been viewed, here is the answer for it: \n{old_responses_list[i]}"
 
-        return root_tag.prettify()
+                body.append(tag)
+                body.append("\n\n")
+
+            return root_tag.prettify()
+        
+        return html_tags_list[current_iter]
 
     def process_page(
         self,
@@ -125,6 +128,13 @@ class HTMLProcessor:
         split=False,
         context_len_checker=None,
     ):
+
+        if processing_settings.use_only_text:
+            if not split:
+                return self.to_md(html_content)
+
+            return []
+
         content = BeautifulSoup(html_content, "html.parser")
         if processing_settings.head:
             head = content.find("head")
@@ -150,5 +160,7 @@ class HTMLProcessor:
                 only_visual_tags=not processing_settings.script,
                 context_len_checker=context_len_checker,
             )
-            return documents, body_page_meta
-        return [], {}
+            return documents
+        
+        
+        return []
