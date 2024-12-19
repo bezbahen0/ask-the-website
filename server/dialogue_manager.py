@@ -1,7 +1,7 @@
 import os
 import uuid
 
-from server.agent.html_agent import HTMLAgent
+from server.agent import get_agent
 from server.constants import LLM_FOLDER_PATH
 from server.db import add_message, get_chat_messages
 from server.model import LlamaCppWrapper
@@ -41,8 +41,6 @@ class DialogManager:
 
         self.llm_client = self.get_llm_client()
 
-        self.agent = HTMLAgent(llm_client=self.llm_client)
-
     def add_chat_query(
         self,
         chat_id,
@@ -50,20 +48,20 @@ class DialogManager:
         page_content,
         url,
         processing_settings,
-        file_type="html",
     ):
         chat_history = get_chat_messages(chat_id=chat_id)
+        agent = get_agent(processing_settings.content_type)(self.llm_client)
 
         add_message(
             1,
             chat_id=chat_id,
             url=url,
-            file_type=file_type,
+            file_type=processing_settings.content_type,
             role="user",
             message=user_query,
             model_name="",
-            service_comments="",
-            version="0.3.4",
+            service_comments=str(processing_settings.json()),
+            version="0.3.5.1",
         )
 
         print("\n".join([f"{d.role} - {d.message}" for d in chat_history]))
@@ -71,16 +69,16 @@ class DialogManager:
         print(processing_settings)
 
         if processing_settings.use_page_context:
-            bot_response = self.agent.get_relevant_info(
+            bot_response = agent.get_relevant_info(
                 # dialog_roadmap.user_input_explanation_what_he_want, page_content, url
                 user_query,
                 chat_history,
                 page_content,
                 url,
-                processing_settings,
+                processing_settings.processing_settings,
             )
         else:
-            bot_response = self.agent.generate_chat_response(
+            bot_response = agent.generate_chat_response(
                 get_chat_messages(chat_id=chat_id)
             )
 
@@ -91,7 +89,7 @@ class DialogManager:
             yield chunk
 
         params = {
-            "llm_params": self.agent.client.get_params(),
+            "llm_params": agent.client.get_params(),
             "processing_settings": processing_settings.json(),
         }
 
@@ -99,12 +97,12 @@ class DialogManager:
             1,
             chat_id=chat_id,
             url=url,
-            file_type=file_type,
+            file_type=processing_settings.content_type,
             role="bot",
             message=complete_response,
             model_name=self.model_name,
             service_comments=str(params),
-            version="0.3.4",
+            version="0.3.5.1",
         )
 
     def from_chat_to_llm_tempalte(self, dialog_history):

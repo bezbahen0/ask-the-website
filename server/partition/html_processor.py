@@ -1,43 +1,24 @@
 import re
 import html2text
-from langchain_core.documents import Document
 from bs4 import BeautifulSoup, NavigableString, Tag, Comment
+from pydantic import BaseModel
 
-from langchain_text_splitters import (
-    Language,
-    RecursiveCharacterTextSplitter,
-    MarkdownHeaderTextSplitter,
-)
-
-import pprint
+# settings class pydantic
+# 
+class HTMLProcessingSettings(BaseModel):
+    use_only_text: bool 
+    use_tag_attributes: bool
+    body: bool
+    head: bool
+    script: bool
 
 
 class HTMLProcessor:
-    def __init__(self, min_chunk_len=128, chunk_overlap=40, unicode=False):
-        self.min_chunk_len = min_chunk_len
+    def __init__(self):
+        self.html2text = html2text.HTML2Text()
+        self.html2text.ignore_images = True
 
-    def assign_ids(self, html_content):
-        soup = BeautifulSoup(html_content, "html.parser")
-        id_counter = 1
-
-        for tag in soup.find_all():
-            if not tag.get("id"):
-                tag["id"] = f"auto-id-{id_counter}"
-                id_counter += 1
-
-        return str(soup)
-
-    def to_md(self, html_content, type_process="simple"):
-        if type_process == "simple":
-            return self.html2text.handle(html_content)
-        elif type_process == "just_text":
-            if self.html2text.ignore_links:
-                res = self.html2text.handle(html_content)
-            else:
-                self.html2text.ignore_links = True
-                res = self.html2text.handle(html_content)
-                self.html2text.ignore_links = False
-            return res
+    def to_md(self, html_content):
         return self.html2text.handle(html_content)
 
     def _prepare_html_tag(self, html_tag, only_visual_tags, tag_attributes):
@@ -145,12 +126,6 @@ class HTMLProcessor:
         context_len_checker=None,
     ):
         content = BeautifulSoup(html_content, "html.parser")
-
-        if processing_settings.body:
-            self.body = content.find("body")
-            if not self.body:
-                self.body = content
-
         if processing_settings.head:
             head = content.find("head")
 
@@ -162,13 +137,18 @@ class HTMLProcessor:
             else:
                 page_meta = {}
 
-        documents, body_page_meta = self._process_body(
-            self.body,
-            page_url,
-            split=split,
-            tag_attributes=processing_settings.tag_attributes,
-            only_visual_tags=not processing_settings.scripts,
-            context_len_checker=context_len_checker,
-        )
-        # page_meta.update(body_page_meta)
-        return documents, body_page_meta
+        if processing_settings.body:
+            body = content.find("body")
+            if not body:
+                body = content
+            
+            documents, body_page_meta = self._process_body(
+                body,
+                page_url,
+                split=split,
+                tag_attributes=processing_settings.use_tag_attributes,
+                only_visual_tags=not processing_settings.script,
+                context_len_checker=context_len_checker,
+            )
+            return documents, body_page_meta
+        return [], {}

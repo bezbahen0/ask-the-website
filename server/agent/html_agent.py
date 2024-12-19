@@ -1,9 +1,12 @@
-from server.partition import get_processor
 from tqdm import tqdm
 
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 from enum import Enum
+
+from server.partition import get_processor
+from server.partition.html_processor import HTMLProcessingSettings
+
 
 SYSTEM_PROMPT = """Твоя задача быть ассистентом для помощи мне в работе над документами в формате html в браузере, который я вижу, я буду упоминать тебя о том, на какой странице я сейчас нахожусь, это как дополнительная информация тебе, а также передать контекстный документ в формате html.
 
@@ -23,7 +26,11 @@ class HTMLAgent:
 
         self.content_processor = get_processor()
 
-    def get_relevant_info(self, question, dialog_history, context, url, processing_settings):
+    def get_relevant_info(
+        self, question, dialog_history, context, url, processing_settings
+    ):
+        processing_settings = HTMLProcessingSettings(**processing_settings)
+
         messages = [
             {
                 "role": "user" if conv.role == "user" else "assistant",
@@ -34,7 +41,7 @@ class HTMLAgent:
 
         print(f"page_url: {url}")
 
-        self.content_processor = get_processor(page_type="html")
+        self.content_processor = get_processor(page_type="text/html")
         documents, page_meta = self.content_processor.process_page(
             context,
             url,
@@ -68,16 +75,12 @@ class HTMLAgent:
                 response = self.client.generate(messages_parting, stream=False)
                 relevant_chunks.append(response)
                 print(doc)
-            messages = (
-                
-                + messages
-                + [
-                    {
-                        "role": "user",
-                        "content": f"Составь единый ответы из нескольких User query: ```{question}``` \n\n Ответы по разным частям одной web страницы: ```{self.content_processor.make_page(documents, len(documents)-1, relevant_chunks)}```",
-                    },
-                ]
-            )
+            messages = +messages + [
+                {
+                    "role": "user",
+                    "content": f"Составь единый ответы из нескольких User query: ```{question}``` \n\n Ответы по разным частям одной web страницы: ```{self.content_processor.make_page(documents, len(documents)-1, relevant_chunks)}```",
+                },
+            ]
             response_from_model = self.client.generate(messages, stream=True)
         else:
             print("\n\nGOOOODYYYY\n\n")

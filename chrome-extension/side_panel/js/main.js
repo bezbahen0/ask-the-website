@@ -67,7 +67,7 @@ class App {
                 chatId,
                 pageUrl: pageContent.url,
                 pageContent: pageContent.content,
-                contextParams
+                contextParams: contextParams
             });
         } catch (error) {
             console.error('Error sending message:', error);
@@ -77,6 +77,7 @@ class App {
 
     async sendRequest({ query, chatId, pageUrl, pageContent, contextParams }) {
         const url = `${this.settings.url}query`;
+        console.log("Context params to query: ", contextParams)
         const response = await fetch(url, {
             method: 'POST',
             headers: {

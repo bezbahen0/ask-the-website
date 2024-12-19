@@ -6,7 +6,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from server.dialogue_manager import DialogManager
-
 app = FastAPI()
 
 # Enable CORS
@@ -31,12 +30,10 @@ class Chat(BaseModel):
     chat_id: str
 
 
-class ProcessingSettings(BaseModel):
+class PageContentProcessingSettings(BaseModel):
     use_page_context: bool
-    tag_attributes: bool
-    body: bool
-    head: bool
-    scripts: bool
+    content_type: str
+    processing_settings: dict
 
 
 class Query(BaseModel):
@@ -44,7 +41,7 @@ class Query(BaseModel):
     query: str
     page_content: str
     page_url: str
-    processing_settings: ProcessingSettings
+    processing_settings: PageContentProcessingSettings
 
 
 @app.get("/get_chat_id")
