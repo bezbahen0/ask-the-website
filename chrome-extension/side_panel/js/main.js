@@ -57,7 +57,7 @@ class App {
             if (this.state.selectedContent) {
                 pageContent = this.state.selectedContent;
             } else {
-                pageContent = await ContentManager.getPageContent();
+                pageContent = await ContentManager.getPageContent(contextParams["content_type"]);
             }
     
             console.log(pageContent)

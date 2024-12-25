@@ -14,7 +14,7 @@ export class ContentManager {
         return text;
     }
 
-    static getPageContent() {
+    static getPageContent(contentType) {
         return new Promise((resolve) => {
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
                 if (chrome.runtime.lastError) {
@@ -25,13 +25,19 @@ export class ContentManager {
                 const tabId = tabs[0].id;
                 const tabUrl = tabs[0].url;
 
-                chrome.tabs.sendMessage(tabId, { action: "getPageContent" }, (response) => {
-                    if (chrome.runtime.lastError) {
-                        resolve({ url: tabUrl, content: "" });
-                        return;
-                    }
-                    resolve({ url: tabUrl, content: response ? response.content : "" });
-                });
+                if (contentType.includes('text/html')) {
+                    chrome.tabs.sendMessage(tabId, { action: "getPageContent" }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            resolve({ url: tabUrl, content: "" });
+                            return;
+                        }
+                        resolve({ url: tabUrl, content: response ? response.content : "" });
+                    });
+                } else if (contentType.includes('application/pdf')) {
+                    resolve({ url: tabUrl, content: "PDF content - unable to access directly"});
+                } else {
+                    resolve({ url: tabUrl, content: "Unsupported content type: " + contentType});
+                }
             });
         });
     }

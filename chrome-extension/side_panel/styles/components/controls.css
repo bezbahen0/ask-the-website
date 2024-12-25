@@ -1,9 +1,11 @@
 .main-controls-container {
     display: flex;
-    gap: 10px;
+    gap: 1px;
     margin: 5px;
     padding: 5px;
     background-color: rgb(53, 53, 53);
+    align-items: flex-start;
+    overflow-y: auto;
 }
 
 .buttons-column {
@@ -24,6 +26,8 @@
 .context-controls label {
     color: white;
     font-size: 13px;
+    white-space: nowrap;
+    display: block;
 }
 
 #contextOptions {
