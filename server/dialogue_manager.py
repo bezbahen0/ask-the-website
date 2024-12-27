@@ -16,10 +16,10 @@ LLM_MODEL = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 class DialogManager:
     def __init__(
         self,
-        temperature=0.0,
-        max_new_tokens=2048,
+        temperature=0.3,
+        max_new_tokens=4048,
         max_context_size=15000,
-        max_prompt_size=2000,
+        max_prompt_size=3000,
         repeat_penalty=1.1,
         top_k=30,
         top_p=1.0,
@@ -61,7 +61,7 @@ class DialogManager:
             message=user_query,
             model_name="",
             service_comments=str(processing_settings.json()),
-            version="0.3.5.1",
+            version="0.3.5.5",
         )
 
         print("\n".join([f"{d.role} - {d.message}" for d in chat_history]))
@@ -102,7 +102,7 @@ class DialogManager:
             message=complete_response,
             model_name=self.model_name,
             service_comments=str(params),
-            version="0.3.5.1",
+            version="0.3.5.5",
         )
 
     def from_chat_to_llm_tempalte(self, dialog_history):

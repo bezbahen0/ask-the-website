@@ -2,11 +2,13 @@ const contextConfigs = {
     'text/html': [
         { backend_id: 'use_tag_attributes', id: 'useTagAttributes', label: 'Tag Attributes' },
         { backend_id: 'use_only_text', id: 'useOnlyText', label: 'Only text' },
+        { backend_id: 'concatenate_small_chunks', id: 'concatenateSmallChunks', label: 'Concatenate small chunks' },
         { backend_id: 'body', id: 'useBodyTag', label: 'Body' },
         { backend_id: 'head', id: 'useHeadTag', label: 'Head' },
-        { backend_id: 'script', id: 'useScriptTag', label: 'Scripts' }
+        { backend_id: 'script', id: 'useScriptTag', label: 'Scripts' },
+
     ],
- };
+};
 
 
 export class Context {
@@ -35,7 +37,7 @@ export class Context {
                 this.updateContextOptions().catch(console.error);
             });
         });
-    
+
         chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
             if (changeInfo.status === 'complete') {
                 this.updateContextOptions().catch(console.error);
@@ -50,22 +52,22 @@ export class Context {
 
     async getPageContentType() {
         return new Promise((resolve) => {
-            chrome.tabs.query({active: true, currentWindow: true}, async function(tabs) {
+            chrome.tabs.query({ active: true, currentWindow: true }, async function (tabs) {
                 let currentTab = tabs[0];
-                
+
                 if (currentTab.url.startsWith('chrome://')) {
                     resolve("");
                     return;
                 }
 
                 try {
-                    
+
                     let response = await fetch(currentTab.url);
                     let contentType = response.headers.get('Content-Type');
                     contentType = contentType.split(';')[0];
                     console.log('Content Type:', contentType);
                     resolve(contentType);
-                } catch(error) {
+                } catch (error) {
                     resolve("");
                 }
             });
@@ -77,17 +79,17 @@ export class Context {
         console.log('Generating options for content type:', contentType);
         const options = contextConfigs[contentType] || [];
         console.log('Available options:', options);
-    
+
         options.forEach(option => {
             const label = document.createElement('label');
             const input = document.createElement('input');
-            
+
             input.type = 'checkbox';
             input.id = option.id;
-            
+
             label.appendChild(input);
             label.appendChild(document.createTextNode(option.label));
-            
+
             this.contextOptions.appendChild(label);
         });
     }
@@ -95,11 +97,11 @@ export class Context {
     async toggleContext() {
         this.contextOptions.style.display = this.usePageContext.checked ? 'block' : 'none';
         this.useContext = this.usePageContext.checked;
-    
+
         await this.updateContextOptions();
-    
+
         this.generateContextOptions(this.contentType);
-    
+
         this.onContextChange(this.getContextParams());
     }
 
@@ -108,15 +110,15 @@ export class Context {
         const options = contextConfigs[this.contentType] || [];
 
         let contextParams = {};
-        
+
         options.forEach(option => {
-  
+
             const element = document.getElementById(option.id);
             contextParams[option.backend_id] = element.checked
         });
 
         console.log(contextParams)
 
-        return {use_page_context: this.usePageContext.checked, content_type: this.contentType, processing_settings: contextParams};
+        return { use_page_context: this.usePageContext.checked, content_type: this.contentType, processing_settings: contextParams };
     }
 }

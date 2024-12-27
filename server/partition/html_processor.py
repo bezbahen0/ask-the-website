@@ -2,11 +2,13 @@ import re
 import html2text
 from bs4 import BeautifulSoup, NavigableString, Tag, Comment
 from pydantic import BaseModel
+import pprint
 
 
 class HTMLProcessingSettings(BaseModel):
-    use_only_text: bool 
+    use_only_text: bool
     use_tag_attributes: bool
+    concatenate_small_chunks: bool
     body: bool
     head: bool
     script: bool
@@ -20,6 +22,10 @@ class HTMLProcessor:
     def to_md(self, html_content):
         return self.html2text.handle(html_content)
 
+    def is_full_page(self, html_content):
+        soup = BeautifulSoup(html_content, "html.parser")
+        return soup.find("html") != None
+
     def _prepare_html_tag(self, html_tag, only_visual_tags, tag_attributes):
         html_tag = BeautifulSoup(html_tag, "html.parser")
         for tag in html_tag.find_all(True):
@@ -27,11 +33,15 @@ class HTMLProcessor:
                 if tag.name in ["style", "script", "svg"]:
                     tag.decompose()
                     continue
-            
+
             if not tag_attributes:
                 if tag.attrs:
-                    attrs_to_keep = ['href']
-                    tag.attrs = {attr: value for attr, value in tag.attrs.items() if attr in attrs_to_keep}
+                    attrs_to_keep = ["href"]
+                    tag.attrs = {
+                        attr: value
+                        for attr, value in tag.attrs.items()
+                        if attr in attrs_to_keep
+                    }
         return str(html_tag)
 
     def _find_parent_path(self, tag):
@@ -79,6 +89,7 @@ class HTMLProcessor:
         split,
         only_visual_tags,
         tag_attributes,
+        concatenate_small_chunks,
         context_len_checker=None,
     ):
         html_content = self._prepare_html_tag(
@@ -91,13 +102,50 @@ class HTMLProcessor:
                 str(html_content).replace("\\n", ""), "html.parser"
             )
 
-            docs = self._split_tags_tree(html_body, context_len_checker)
+            docs = self._split_tags_tree(
+                html_body, context_len_checker=context_len_checker
+            )
+            if concatenate_small_chunks:
+                docs = self._concatenate_small_docs(
+                    docs, context_len_checker=context_len_checker
+                )
             docs = [d.strip() for d in docs if d.strip()]
             return docs, page_meta
 
         return [html_content], page_meta
 
-    def make_page(self, html_tags_list, current_iter, old_responses_list, processing_settings):
+    def _concatenate_small_docs(self, docs, context_len_checker):
+        if not docs:
+            return []
+
+        concatenated_docs = []
+        current_doc = ""
+
+        for doc in docs:
+            if not doc:
+                continue
+
+            if current_doc:
+                combined_doc = f"{current_doc}\n\n{doc}"
+            else:
+                combined_doc = doc
+
+            if context_len_checker(combined_doc):
+                current_doc = combined_doc
+            else:
+                if current_doc:
+                    concatenated_docs.append(current_doc)
+                if context_len_checker(doc):
+                    current_doc = doc
+                else:
+                    continue
+
+        if current_doc:
+            concatenated_docs.append(current_doc)
+
+        return concatenated_docs
+
+    def make_page(self, html_tags_list, old_responses_list, processing_settings):
 
         if not processing_settings.use_only_text:
             root_tag = BeautifulSoup("<body></body>", "html.parser")
@@ -106,19 +154,16 @@ class HTMLProcessor:
             for i, tag_string in enumerate(html_tags_list):
                 tag = BeautifulSoup(tag_string, "html.parser").contents[0]
 
-                if i > current_iter:
+                if not isinstance(tag, NavigableString):
                     tag.clear()
-                    tag.string = "MASKED: Will be shown later"
-                elif i < current_iter:
-                    tag.clear()
-                    tag.string = f"This part of the html has already been viewed, here is the answer for it: \n{old_responses_list[i]}"
+                tag.string = f"{old_responses_list[i]}"
 
                 body.append(tag)
                 body.append("\n\n")
 
             return root_tag.prettify()
-        
-        return html_tags_list[current_iter]
+
+        return "\n\n".join(html_tags_list)
 
     def process_page(
         self,
@@ -129,13 +174,28 @@ class HTMLProcessor:
         context_len_checker=None,
     ):
 
+        content = BeautifulSoup(html_content, "html.parser")
+
         if processing_settings.use_only_text:
             if not split:
                 return self.to_md(html_content)
 
-            return []
+            documents, body_page_meta = self._process_body(
+                content,
+                page_url,
+                split=split,
+                tag_attributes=True,
+                only_visual_tags=True,
+                concatenate_small_chunks=processing_settings.concatenate_small_chunks,
+                context_len_checker=context_len_checker,
+            )
 
-        content = BeautifulSoup(html_content, "html.parser")
+            documents = [
+                self.to_md(doc).strip() for doc in documents if self.to_md(doc).strip()
+            ]
+            pprint.pp(documents)
+            return documents
+
         if processing_settings.head:
             head = content.find("head")
 
@@ -151,16 +211,16 @@ class HTMLProcessor:
             body = content.find("body")
             if not body:
                 body = content
-            
+
             documents, body_page_meta = self._process_body(
                 body,
                 page_url,
                 split=split,
                 tag_attributes=processing_settings.use_tag_attributes,
                 only_visual_tags=not processing_settings.script,
+                concatenate_small_chunks=processing_settings.concatenate_small_chunks,
                 context_len_checker=context_len_checker,
             )
             return documents
-        
-        
+
         return []

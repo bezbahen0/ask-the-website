@@ -8,11 +8,55 @@ from server.partition import get_processor
 from server.partition.html_processor import HTMLProcessingSettings
 
 
-SYSTEM_PROMPT = """Твоя задача быть ассистентом для помощи мне в работе над документами в формате html в браузере, который я вижу, я буду упоминать тебя о том, на какой странице я сейчас нахожусь, это как дополнительная информация тебе, а также передать контекстный документ в формате html.
+SYSTEM_PROMPT = """You are an intelligent browser assistant that helps users analyze and work with content from the currently active browser tab. Your main tasks are:
 
-HTML-контент может быть сложным, там могут быть блокирующие факторы в виде графических меню, рекламных материалов, старайся найти необходимую мне информацию среди всего этого и сам по себе, рассуждая над тем, что из информации в формате html тебе понадобится.
+1. Understand and process content only from the current active tab (HTML, PDF, plain text)
+2. Provide relevant information and answers based on the given context
+3. Help users find specific information within the current page
+4. Generate summaries, explanations, or analyses as requested
 
-Ты можешь дать ответ только на одной странице за раз, если тебе нужно еще раз увидеть прошлую страницу, чтобы дать ответ, скажи мне об этом."""
+Important rules:
+- Always respond in the same language the user's question is asked in
+- Base your answers strictly on the provided context from the current tab
+- If information needed is on another page, politely ask the user to navigate to that page first
+- If something is unclear or missing from the context, acknowledge this
+- Keep responses clear, concise, and well-structured
+- When appropriate, use formatting (bullet points, paragraphs) for better readability
+- Never make assumptions about content that isn't visible in the current tab
+- If user asks about information from another page, remind them that you can only work with the current tab's content
+"""
+
+
+CHUNK_PROCESSING_PROMPT = """You are processing a part of a webpage. Your task is to:
+
+1. Extract only relevant information from this chunk that relates to the user's question
+2. Provide a focused, self-contained response about this specific part
+3. Consider previous findings when analyzing new information
+4. Keep the response concise and factual
+5. Format the response so it can be easily combined with other parts
+
+Remember:
+- This is part of an iterative analysis process
+- Focus on new relevant information in this chunk
+- Avoid repeating information already found in previous parts
+- Maintain the user's original language in the response
+- If you find information that complements or contradicts previous findings, note this
+
+The final response will be assembled from multiple parts, so keep your answer focused and relevant to this specific chunk.
+"""
+
+
+class AnswerGeneratorWithRelevanceScore(BaseModel):
+    reflection: str
+    answer: str
+    answer_relevance_score_to_question: float = Field(
+        default=None, description="Relevance to the question (0-1)"
+    )
+
+
+class AnswerGenerator(BaseModel):
+    reflection: str
+    answer: str
 
 
 class HTMLAgent:
@@ -31,7 +75,8 @@ class HTMLAgent:
     ):
         processing_settings = HTMLProcessingSettings(**processing_settings)
 
-        messages = [
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages += [
             {
                 "role": "user" if conv.role == "user" else "assistant",
                 "content": conv.message,
@@ -42,6 +87,15 @@ class HTMLAgent:
         print(f"page_url: {url}")
 
         self.content_processor = get_processor(page_type="text/html")
+
+        is_full_page = self.content_processor.is_full_page(context)
+        print(is_full_page)
+        selected_content = (
+            "Full web page"
+            if is_full_page
+            else "This is not the entire web page, it is the selected content on the page"
+        )
+
         documents = self.content_processor.process_page(
             context,
             url,
@@ -49,6 +103,7 @@ class HTMLAgent:
             processing_settings=processing_settings,
             context_len_checker=self.client.check_context_len,
         )
+        print(documents)
 
         if not self.client.check_context_len(text=str(documents)):
             documents = self.content_processor.process_page(
@@ -64,35 +119,51 @@ class HTMLAgent:
             )
             relevant_chunks = []
             for i, doc in tqdm(enumerate(documents), total=len(documents)):
-                doc = self.content_processor.make_page(documents, i, relevant_chunks, processing_settings)
-                messages_parting = messages + [
+                doc = f"""{i} part of the webpage, the webpage is divided into {len(documents)} parts in total\n```{doc}```\n"""
+
+                messages_parting = [
+                    {"role": "system", "content": CHUNK_PROCESSING_PROMPT}
+                ]
+                messages_parting += messages[1:]
+                messages_parting += [
                     {
                         "role": "user",
-                        "content": f"{question} Не повторяй информацию что была в прошлых ответах, они помеченны ты увидишь \n\n Page Url: ```{url}``` \n\nPart of web page \n\n ```{doc}```",
+                        "content": f"{question} \n\n Page Url: ```{url}``` \n\nPart of web page \n\n {doc} \n\nYour response format: {AnswerGeneratorWithRelevanceScore.model_json_schema()}",
                     },
                 ]
 
-                response = self.client.generate(messages_parting, stream=False)
-                relevant_chunks.append(response)
+                response = self.client.generate(
+                    messages_parting,
+                    stream=False,
+                    schema=AnswerGeneratorWithRelevanceScore.model_json_schema(),
+                )
+                print(response)
                 print(doc)
-            messages = messages + [
+                relevant_chunks.append(response)
+
+            messages += [
                 {
                     "role": "user",
-                    "content": f"Составь единый ответы из нескольких User query: ```{question}``` \n\n Ответы по разным частям одной web страницы: ```{self.content_processor.make_page(documents, len(documents)-1, relevant_chunks, processing_settings)}```",
+                    "content": f"My question: {question} \n\n   {selected_content}. The content has already been submitted part by part here are the answers to my question in parts with reflection: \n\n```{self.content_processor.make_page(documents, relevant_chunks, processing_settings)}```",
                 },
             ]
             response_from_model = self.client.generate(messages, stream=True)
         else:
-            print("\n\nGOOOODYYYY\n\n")
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+            print("\n\nSINGLE RUN\n\n")
+            print(str(documents))
+
             messages += [
-                # {"role": "system", "content": CITATION_SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": f"{question} \n\n Page url: ```{url}```\n\n Web page \n\n ```{str(documents)}```",
+                    "content": f"{question} \n\n Page url: ```{url}```\n\n {selected_content} \n\n ```{str(documents)}```",
+                    # Your response format: {AnswerGenerator.model_json_schema()}",
                 },
             ]
-            response_from_model = self.client.generate(messages, stream=True)
+            response_from_model = self.client.generate(
+                messages,
+                stream=True,  
+                # schema=AnswerGenerator.model_json_schema()
+            )
         return response_from_model
 
     def generate_chat_response(self, dialog_history):
