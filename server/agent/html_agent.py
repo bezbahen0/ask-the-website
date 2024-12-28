@@ -6,14 +6,15 @@ from enum import Enum
 
 from server.partition import get_processor
 from server.partition.html_processor import HTMLProcessingSettings
-
+from server.model import JsonFieldStreamProcessor
 
 SYSTEM_PROMPT = """You are an intelligent browser assistant that helps users analyze and work with content from the currently active browser tab. Your main tasks are:
 
-1. Understand and process content only from the current active tab (HTML, PDF, plain text)
-2. Provide relevant information and answers based on the given context
-3. Help users find specific information within the current page
-4. Generate summaries, explanations, or analyses as requested
+1. Reflect on the information you have and what answers you will give to the question
+2. Understand and process content only from the current active tab (HTML, PDF, plain text)
+3. Provide relevant information and answers based on the given context
+4. Help users find specific information within the current page
+5. Generate summaries, explanations, or analyses as requested
 
 Important rules:
 - Always respond in the same language the user's question is asked in
@@ -29,16 +30,18 @@ Important rules:
 
 CHUNK_PROCESSING_PROMPT = """You are processing a part of a webpage. Your task is to:
 
-1. Extract only relevant information from this chunk that relates to the user's question
-2. Provide a focused, self-contained response about this specific part
-3. Consider previous findings when analyzing new information
-4. Keep the response concise and factual
-5. Format the response so it can be easily combined with other parts
+1. Reflect on the information you have and what answers you will give to the question
+2. Extract only relevant information from this chunk that relates to the user's question
+3. Provide a focused, self-contained response about this specific part
+4. Consider previous findings when analyzing new information
+5. Keep the response concise and factual
+6. Format the response so it can be easily combined with other parts
 
 Remember:
 - This is part of an iterative analysis process
 - Focus on new relevant information in this chunk
 - Avoid repeating information already found in previous parts
+- Always respond in the same language the user's question is asked in
 - Maintain the user's original language in the response
 - If you find information that complements or contradicts previous findings, note this
 
@@ -47,7 +50,7 @@ The final response will be assembled from multiple parts, so keep your answer fo
 
 
 class AnswerGeneratorWithRelevanceScore(BaseModel):
-    reflection: str
+    reflections: str
     answer: str
     answer_relevance_score_to_question: float = Field(
         default=None, description="Relevance to the question (0-1)"
@@ -55,7 +58,7 @@ class AnswerGeneratorWithRelevanceScore(BaseModel):
 
 
 class AnswerGenerator(BaseModel):
-    reflection: str
+    reflections: str
     answer: str
 
 
@@ -69,6 +72,7 @@ class HTMLAgent:
         self.client = llm_client
 
         self.content_processor = get_processor()
+        self.answer_processor = JsonFieldStreamProcessor(field_name="answer")
 
     def get_relevant_info(
         self, question, dialog_history, context, url, processing_settings
@@ -79,7 +83,7 @@ class HTMLAgent:
         messages += [
             {
                 "role": "user" if conv.role == "user" else "assistant",
-                "content": conv.message,
+                "content": f"{conv.message} Page Url: ```{conv.url}```",
             }
             for conv in dialog_history
         ]
@@ -128,7 +132,8 @@ class HTMLAgent:
                 messages_parting += [
                     {
                         "role": "user",
-                        "content": f"{question} \n\n Page Url: ```{url}``` \n\nPart of web page \n\n {doc} \n\nYour response format: {AnswerGeneratorWithRelevanceScore.model_json_schema()}",
+                        "content": f"{question} \n\n Page Url: ```{url}``` \n\nPart of web page \n\n {doc} \n\n"
+                        + f"Your response format: {AnswerGeneratorWithRelevanceScore.model_json_schema()}",
                     },
                 ]
 
@@ -147,7 +152,12 @@ class HTMLAgent:
                     "content": f"My question: {question} \n\n   {selected_content}. The content has already been submitted part by part here are the answers to my question in parts with reflection: \n\n```{self.content_processor.make_page(documents, relevant_chunks, processing_settings)}```",
                 },
             ]
-            response_from_model = self.client.generate(messages, stream=True)
+            response_from_model = self.client.generate(
+                messages,
+                stream=True,
+                schema=AnswerGenerator.model_json_schema(),
+                stream_processor=self.answer_processor,
+            )
         else:
             print("\n\nSINGLE RUN\n\n")
             print(str(documents))
@@ -155,23 +165,25 @@ class HTMLAgent:
             messages += [
                 {
                     "role": "user",
-                    "content": f"{question} \n\n Page url: ```{url}```\n\n {selected_content} \n\n ```{str(documents)}```",
-                    # Your response format: {AnswerGenerator.model_json_schema()}",
+                    "content": f"Question: {question} \n\n Page url: ```{url}```\n\n {selected_content} \n\n ```{str(documents)}```"
+                    + f"\nYour response format: {AnswerGenerator.model_json_schema()}",
                 },
             ]
             response_from_model = self.client.generate(
                 messages,
-                stream=True,  
-                # schema=AnswerGenerator.model_json_schema()
+                stream=True,
+                schema=AnswerGenerator.model_json_schema(),
+                stream_processor=self.answer_processor,
             )
         return response_from_model
 
     def generate_chat_response(self, dialog_history):
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        for conv in dialog_history:
-            if conv.role == "user":
-                messages.append({"role": "user", "content": conv.message})
-            else:
-                messages.append({"role": "assistant", "content": conv.message})
-
+        messages += [
+            {
+                "role": "user" if conv.role == "user" else "assistant",
+                "content": f"{conv.message} Page Url: ```{conv.url}```",
+            }
+            for conv in dialog_history
+        ]
         return self.client.generate(messages, stream=True)

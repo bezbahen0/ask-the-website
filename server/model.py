@@ -4,6 +4,71 @@ from server.partition import get_processor
 from tqdm import tqdm
 
 
+from abc import ABC, abstractmethod
+from typing import Generator, Any, Optional, Callable
+
+
+class StreamProcessor(ABC):
+    @abstractmethod
+    def process_stream(self, stream: Generator) -> Generator:
+        pass
+
+
+class JsonFieldStreamProcessor(StreamProcessor):
+    def __init__(self, field_name: str):
+        self.field_name = field_name
+        self.buffer = ""
+        self.in_field = False
+        self.json_started = False
+
+    def process_stream(self, stream: Generator) -> Generator:
+        for token in stream:
+            content = token["choices"][0]["delta"].get("content", "")
+            if not content:
+                continue
+
+            self.buffer += content
+
+            if not self.json_started and "{" in self.buffer:
+                self.json_started = True
+
+            if not self.json_started:
+                continue
+
+            field_marker = f'"{self.field_name}": "'
+            if field_marker in self.buffer and not self.in_field:
+                self.in_field = True
+                self.buffer = self.buffer.split(field_marker)[1]
+
+            if self.in_field:
+                index = 0
+                while index < len(self.buffer):
+                    if self.buffer[index] == '"':
+                        if index > 0 and self.buffer[index - 1] == '\\':
+                            index += 1
+                            continue
+                        
+                        field_content = self.buffer[:index]
+                        self.buffer = self.buffer[index + 1:]
+                        
+                        if field_content:
+                            yield field_content
+                        
+                        self.in_field = False
+                        break
+                    index += 1
+                
+                if self.in_field and self.buffer:
+                    yield self.buffer
+                    self.buffer = ""
+
+
+class DefaultStreamProcessor(StreamProcessor):
+    def process_stream(self, stream: Generator) -> Generator:
+        for token in stream:
+            yield token["choices"][0]["delta"].get("content", "")
+
+
 class LlamaCppWrapper:
     def __init__(
         self,
@@ -50,7 +115,13 @@ class LlamaCppWrapper:
     def tokenize(self, text):
         return self.model.tokenize(text.encode("utf8"))
 
-    def generate(self, template, stream=False, schema=None):
+    def generate(
+        self,
+        template,
+        stream=False,
+        schema=None,
+        stream_processor=None,
+    ):
         if schema:
             response_generator = self.model.create_chat_completion(
                 template,
@@ -70,8 +141,10 @@ class LlamaCppWrapper:
         if stream:
 
             def generate():
-                for token in response_generator:
-                    yield token["choices"][0]["delta"].get("content", "")
+                processor = (
+                    stream_processor if stream_processor else DefaultStreamProcessor()
+                )
+                return processor.process_stream(response_generator)
 
             return generate()
         return response_generator["choices"][0]["message"]["content"]
