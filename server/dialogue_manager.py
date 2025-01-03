@@ -29,12 +29,21 @@ SYSTEM_PROMPT = """На основе предоставленной информ
 - Цитируй источник при необходимости
 """
 
-REWRITE_PROMPT = """Есть история диалога с двумя действующими ролями user и bot: {dialog}
-Твоя задача используя всю информацию из диалога выделить ключевой вопрос который есть у user в последнем его сообщении дополнив его всеми необходимыми терминами которые встречаются в диалоге для повышения полноты вопроса.
+REWRITE_PROMPT = """Есть история диалога с двумя действующими ролями user и bot: {dialog}.
+
+User видит страницу браузера по контексту которой отвечает bot.
+
+Твоя задача используя всю информацию из диалога выделить конкретизированный вопрос который есть у user в последнем его сообщении дополнив его всеми необходимыми терминами которые встречаются в диалоге для повышения полноты вопроса.
+
+Поразмышляй сначала над тем что происходит в диалоге и что надо делать.
+
+Если диалог слишком маленький и не можешь сформулировать вопрос то оставь вопрос в исходном виде.
 
 Если не можешь перефразировать вопрос и он и так достаточно полный то оставь его в исходном виде.
 
-Формат твоего ответа должен быть таким 
+Не ври, используй только то что есть в диалоге от себя ничегон не добавляй.
+
+Формат твоего ответа будет в таком виде:
 {response_format}
 """
 
@@ -80,7 +89,6 @@ class DialogManager:
         url,
         processing_settings,
     ):
-        chat_history = get_chat_messages(chat_id=chat_id)
         agent = get_agent(processing_settings.content_type)(self.llm_client)
 
         add_message(
@@ -92,10 +100,12 @@ class DialogManager:
             message=user_query,
             model_name="",
             service_comments=str(processing_settings.json()),
-            version="0.3.6.2",
+            version="0.3.6.3",
         )
 
-        print("\n".join([f"{d.role} - {d.message}" for d in chat_history]))
+        chat_history = get_chat_messages(chat_id=chat_id)
+
+        print("\n".join([f"{d.role} - {d.message}." for d in chat_history]))
         print(user_query)
         print(processing_settings)
 
@@ -106,8 +116,7 @@ class DialogManager:
             )
 
             agent_relevant_info = agent.get_relevant_info(
-                user_query,
-                chat_history,
+                specific_user_query,
                 page_content,
                 url,
                 processing_settings.processing_settings,
@@ -138,7 +147,7 @@ class DialogManager:
             message=complete_response,
             model_name=self.model_name,
             service_comments=str(params),
-            version="0.3.6.2",
+            version="0.3.6.3",
         )
 
     def from_chat_to_llm_tempalte(self, dialog_history):
@@ -177,7 +186,15 @@ class DialogManager:
 
     def get_specific_question_from_user(self, dialog_history):
         response = self.llm_client.generate(
-            [{"role": "user", "content": REWRITE_PROMPT.format(dialog=dialog_history, response_format=RewriteQuestion.model_json_schema())}],
+            [
+                {
+                    "role": "user",
+                    "content": REWRITE_PROMPT.format(
+                        dialog="Начало диалога\n\n" + dialog_history,
+                        response_format=RewriteQuestion.model_json_schema(),
+                    ),
+                }
+            ],
             schema=RewriteQuestion.model_json_schema(),
             stream=False,
         )

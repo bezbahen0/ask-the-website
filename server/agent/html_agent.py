@@ -81,19 +81,11 @@ class HTMLAgent:
         self.answer_processor = JsonFieldStreamProcessor(field_name="answer")
 
     def get_relevant_info(
-        self, question, dialog_history, context, url, processing_settings
+        self, question, context, url, processing_settings
     ):
         processing_settings = HTMLProcessingSettings(**processing_settings)
 
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        messages += [
-            {
-                "role": "user" if conv.role == "user" else "assistant",
-                "content": f"{conv.message} Page Url: ```{conv.url}```",
-            }
-            for conv in dialog_history
-        ]
-
         print(f"page_url: {url}")
 
         self.content_processor = get_processor(page_type="text/html")
@@ -134,7 +126,6 @@ class HTMLAgent:
                 messages_parting = [
                     {"role": "system", "content": CHUNK_PROCESSING_PROMPT}
                 ]
-                messages_parting += messages[1:]
                 messages_parting += [
                     {
                         "role": "user",
