@@ -8,7 +8,7 @@ from server.partition import get_processor
 from server.partition.html_processor import HTMLProcessingSettings
 from server.model import JsonFieldStreamProcessor
 
-SYSTEM_PROMPT = """You are an intelligent browser assistant that helps users analyze and work with content from the currently active browser tab. Your main tasks are:
+SYSTEM_PROMPT1 = """You are an intelligent browser assistant that helps users analyze and work with content from the currently active browser tab. Your main tasks are:
 
 1. Reflect on the information you have and what answers you will give to the question
 2. Understand and process content only from the current active tab (HTML, PDF, plain text)
@@ -27,8 +27,11 @@ Important rules:
 - If user asks about information from another page, remind them that you can only work with the current tab's content
 """
 
+SYSTEM_PROMPT = """Находи всю необходимую инфомрацию в куске данных в контексте для ответа на вопрос и выдавай мне ее в исходном виде
+"""
 
-CHUNK_PROCESSING_PROMPT = """You are processing a part of a webpage. Your task is to:
+
+CHUNK_PROCESSING_PROMPT1 = """You are processing a part of a webpage. Your task is to:
 
 1. Reflect on the information you have and what answers you will give to the question
 2. Extract only relevant information from this chunk that relates to the user's question
@@ -48,17 +51,20 @@ Remember:
 The final response will be assembled from multiple parts, so keep your answer focused and relevant to this specific chunk.
 """
 
+CHUNK_PROCESSING_PROMPT = """Находи всю необходимую инфомрацию в куске данных в контексте для ответа на вопрос и выдавай мне ее в исходном виде"""
+
 
 class AnswerGeneratorWithRelevanceScore(BaseModel):
-    reflections: str
+    reflection: str
     answer: str
     answer_relevance_score_to_question: float = Field(
         default=None, description="Relevance to the question (0-1)"
     )
 
+#confidence": "Уровень уверенности в релевантности"
 
 class AnswerGenerator(BaseModel):
-    reflections: str
+    reflection: str
     answer: str
 
 
@@ -154,36 +160,25 @@ class HTMLAgent:
             ]
             response_from_model = self.client.generate(
                 messages,
-                stream=True,
-                schema=AnswerGenerator.model_json_schema(),
-                stream_processor=self.answer_processor,
+                stream=False,
+                schema=AnswerGeneratorWithRelevanceScore.model_json_schema(),
             )
         else:
             print("\n\nSINGLE RUN\n\n")
-            print(str(documents))
+            #print(str(documents))
 
             messages += [
                 {
                     "role": "user",
                     "content": f"Question: {question} \n\n Page url: ```{url}```\n\n {selected_content} \n\n ```{str(documents)}```"
-                    + f"\nYour response format: {AnswerGenerator.model_json_schema()}",
+                    + f"\nYour response format: {AnswerGeneratorWithRelevanceScore.model_json_schema()}",
                 },
             ]
             response_from_model = self.client.generate(
                 messages,
-                stream=True,
-                schema=AnswerGenerator.model_json_schema(),
-                stream_processor=self.answer_processor,
+                stream=False,
+                schema=AnswerGeneratorWithRelevanceScore.model_json_schema(),
             )
+        print("\n\n----------Response from model----------------\n\n")
+        print(response_from_model)
         return response_from_model
-
-    def generate_chat_response(self, dialog_history):
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        messages += [
-            {
-                "role": "user" if conv.role == "user" else "assistant",
-                "content": f"{conv.message} Page Url: ```{conv.url}```",
-            }
-            for conv in dialog_history
-        ]
-        return self.client.generate(messages, stream=True)
