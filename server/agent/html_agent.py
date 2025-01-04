@@ -8,106 +8,106 @@ from server.partition import get_processor
 from server.partition.html_processor import HTMLProcessingSettings
 from server.model import JsonFieldStreamProcessor
 
-SYSTEM_PROMPT1 = """You are an intelligent browser assistant that helps users analyze and work with content from the currently active browser tab. Your main tasks are:
 
-1. Reflect on the information you have and what answers you will give to the question
-2. Understand and process content only from the current active tab (HTML, PDF, plain text)
-3. Provide relevant information and answers based on the given context
-4. Help users find specific information within the current page
-5. Generate summaries, explanations, or analyses as requested
+SYSTEM_PROMPT = """Твоя задача отвечая на этот вопрос ```{question}```, находить в сложном документе полученном после обработки web страницы в браузере и переданном тебе в {format} формате, всю что ты найдешь для ответа на этот вопрос.
+Вот документ:
+```{document}```
 
-Important rules:
-- Always respond in the same language the user's question is asked in
-- Base your answers strictly on the provided context from the current tab
-- If information needed is on another page, politely ask the user to navigate to that page first
-- If something is unclear or missing from the context, acknowledge this
-- Keep responses clear, concise, and well-structured
-- When appropriate, use formatting (bullet points, paragraphs) for better readability
-- Never make assumptions about content that isn't visible in the current tab
-- If user asks about information from another page, remind them that you can only work with the current tab's content
+Так же вот ссылка, {page_url}, по которой этот документ находится.
+
+{additional_processing_markers}
+
+Сначала поразмышляй над основной темой документа, ключевым разделам и их взаимосвязями.
+Найди в контексте информацию, напрямую отвечающую на вопрос.
+Определи связанную информацию, которая может дополнить ответ.
+Оцени достаточность информации для полного ответа.
+Укажи, где информация может быть неполной или требует уточнения.
+В конце выдай всю релевантную информацию.
+
+Формат твоего ответа будет в таком виде:
+{response_format}
 """
 
-SYSTEM_PROMPT = """Находи всю необходимую инфомрацию в куске данных в контексте для ответа на вопрос и выдавай мне ее в исходном виде
+CHUNK_PROCESSING_PROMPT = """Твоя задача отвечая на этот вопрос ```{question}```, находить в куске одного сложного документа полученном после обработки web страницы в браузере и переданном тебе в {format} формате, всю что ты найдешь для ответа на этот вопрос.
+Вот кусок документа:
+```{document}```
+
+Так же вот ссылка, {page_url}, по которой этот документ находится.
+
+{additional_processing_markers}
+
+Сначала поразмышляй над основной темой куска документа, ключевым разделам и их взаимосвязями.
+Найди в контексте информацию, напрямую отвечающую на вопрос.
+Определи связанную информацию, которая может дополнить ответ.
+Оцени достаточность информации для полного ответа.
+Укажи, где информация может быть неполной или требует уточнения.
+В конце выдай всю информацию и общую оценку релевантности документа для ответа на вопрос.
+
+Формат твоего ответа будет в таком виде:
+{response_format}
 """
 
+CHUNK_AGREGATION_PROMPT = """Твоя задача объединить разрозненный ответы одного документа, документ обрабатывался часть за частью, сверху в низ.
+Следовательно, все ответы по разным частям идут в порядке того как они обрабатывались. 
 
-CHUNK_PROCESSING_PROMPT1 = """You are processing a part of a webpage. Your task is to:
+Поразмышляй над тем что у тебя на руках и что нужно сделать.
+Сформируй текст который бы объединил все эти ответы в один ответ.
 
-1. Reflect on the information you have and what answers you will give to the question
-2. Extract only relevant information from this chunk that relates to the user's question
-3. Provide a focused, self-contained response about this specific part
-4. Consider previous findings when analyzing new information
-5. Keep the response concise and factual
-6. Format the response so it can be easily combined with other parts
+Не добавляй от себя ничего, используй только информацию из ответов.
 
-Remember:
-- This is part of an iterative analysis process
-- Focus on new relevant information in this chunk
-- Avoid repeating information already found in previous parts
-- Always respond in the same language the user's question is asked in
-- Maintain the user's original language in the response
-- If you find information that complements or contradicts previous findings, note this
+Вот все ответы в порядке того как они обрабатывались:
+```{documents}```
 
-The final response will be assembled from multiple parts, so keep your answer focused and relevant to this specific chunk.
+Формат твоего ответа будет в таком виде:
+{response_format}
 """
-
-CHUNK_PROCESSING_PROMPT = """Находи всю необходимую инфомрацию в куске данных в контексте для ответа на вопрос и выдавай мне ее в исходном виде"""
 
 
 class AnswerGeneratorWithRelevanceScore(BaseModel):
     reflection: str
-    answer: str
-    answer_relevance_score_to_question: float = Field(
+    relevant_information: str
+    relevant_information_relevance_score_to_question: float = Field(
         default=None, description="Relevance to the question (0-1)"
     )
 
-#confidence": "Уровень уверенности в релевантности"
+
+# confidence": "Уровень уверенности в релевантности"
+
 
 class AnswerGenerator(BaseModel):
     reflection: str
-    answer: str
+    relevant_information: str
 
 
 class HTMLAgent:
     def __init__(
         self,
         llm_client,
-        system_prompt=SYSTEM_PROMPT,
     ):
-        self.system_prompt = system_prompt
         self.client = llm_client
 
         self.content_processor = get_processor()
         self.answer_processor = JsonFieldStreamProcessor(field_name="answer")
 
-    def get_relevant_info(
-        self, question, context, url, processing_settings
-    ):
+    def get_relevant_info(self, question, context, url, processing_settings):
         processing_settings = HTMLProcessingSettings(**processing_settings)
 
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
         print(f"page_url: {url}")
 
         self.content_processor = get_processor(page_type="text/html")
 
         is_full_page = self.content_processor.is_full_page(context)
-        print(is_full_page)
-        selected_content = (
-            "Full web page"
-            if is_full_page
-            else "This is not the entire web page, it is the selected content on the page"
-        )
 
-        documents = self.content_processor.process_page(
+        document = self.content_processor.process_page(
             context,
             url,
             split=False,
             processing_settings=processing_settings,
             context_len_checker=self.client.check_context_len,
         )
-        print(documents)
+        #print(document)
 
-        if not self.client.check_context_len(text=str(documents)):
+        if not self.client.check_context_len(text=document):
             documents = self.content_processor.process_page(
                 context,
                 url,
@@ -121,54 +121,76 @@ class HTMLAgent:
             )
             relevant_chunks = []
             for i, doc in tqdm(enumerate(documents), total=len(documents)):
-                doc = f"""{i} part of the webpage, the webpage is divided into {len(documents)} parts in total\n```{doc}```\n"""
+                additional_processing_markers = f"""{i} part of the webpage, the webpage is divided into {len(documents)} parts in total"""
 
-                messages_parting = [
-                    {"role": "system", "content": CHUNK_PROCESSING_PROMPT}
-                ]
-                messages_parting += [
+                messages = [
                     {
                         "role": "user",
-                        "content": f"{question} \n\n Page Url: ```{url}``` \n\nPart of web page \n\n {doc} \n\n"
-                        + f"Your response format: {AnswerGeneratorWithRelevanceScore.model_json_schema()}",
+                        "content": CHUNK_PROCESSING_PROMPT.format(
+                            question=question,
+                            format=(
+                                "markdown"
+                                if processing_settings.use_only_text
+                                else "html"
+                            ),
+                            document=doc,
+                            page_url=url,
+                            additional_processing_markers=additional_processing_markers,
+                            response_format=AnswerGeneratorWithRelevanceScore.model_json_schema(),
+                        ),
                     },
                 ]
 
                 response = self.client.generate(
-                    messages_parting,
+                    messages,
                     stream=False,
                     schema=AnswerGeneratorWithRelevanceScore.model_json_schema(),
                 )
                 print(response)
-                print(doc)
+                #print(doc)
                 relevant_chunks.append(response)
-
-            messages += [
+            print(relevant_chunks)
+            messages = [
                 {
                     "role": "user",
-                    "content": f"My question: {question} \n\n   {selected_content}. The content has already been submitted part by part here are the answers to my question in parts with reflection: \n\n```{self.content_processor.make_page(documents, relevant_chunks, processing_settings)}```",
+                    "content": CHUNK_AGREGATION_PROMPT.format(
+                        documents=self.content_processor.make_page(
+                            documents, relevant_chunks, processing_settings
+                        ),
+                        response_format=AnswerGenerator.model_json_schema(),
+                    ),
                 },
             ]
             response_from_model = self.client.generate(
                 messages,
                 stream=False,
-                schema=AnswerGeneratorWithRelevanceScore.model_json_schema(),
+                schema=AnswerGenerator.model_json_schema(),
             )
         else:
             print("\n\nSINGLE RUN\n\n")
-            #print(str(documents))
+            #print(document)
 
-            messages += [
+            additional_processing_markers = """"""
+
+            messages = [
                 {
                     "role": "user",
-                    "content": f"Question: {question} \n\n Page url: ```{url}```\n\n {selected_content} \n\n ```{str(documents)}```"
-                    + f"\nYour response format: {AnswerGeneratorWithRelevanceScore.model_json_schema()}",
+                    "content": SYSTEM_PROMPT.format(
+                        question=question,
+                        format=(
+                            "markdown" if processing_settings.use_only_text else "html"
+                        ),
+                        document=document,
+                        page_url=url,
+                        additional_processing_markers=additional_processing_markers,
+                        response_format=AnswerGenerator.model_json_schema(),
+                    ),
                 },
             ]
             response_from_model = self.client.generate(
                 messages,
                 stream=False,
-                schema=AnswerGeneratorWithRelevanceScore.model_json_schema(),
+                schema=AnswerGenerator.model_json_schema(),
             )
         print("\n\n----------Response from model----------------\n\n")
         print(response_from_model)

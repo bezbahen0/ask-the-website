@@ -42,7 +42,7 @@ class HTMLProcessor:
                         for attr, value in tag.attrs.items()
                         if attr in attrs_to_keep
                     }
-        return str(html_tag)
+        return html_tag.prettify()
 
     def _find_parent_path(self, tag):
         tree = []
@@ -112,7 +112,7 @@ class HTMLProcessor:
             docs = [d.strip() for d in docs if d.strip()]
             return docs, page_meta
 
-        return [html_content], page_meta
+        return html_content, page_meta
 
     def _concatenate_small_docs(self, docs, context_len_checker):
         if not docs:
@@ -222,5 +222,3 @@ class HTMLProcessor:
                 context_len_checker=context_len_checker,
             )
             return documents
-
-        return []
