@@ -177,10 +177,13 @@ class DialogManager:
         messages += [
             {
                 "role": "user" if conv.role == "user" else "assistant",
-                "content": f"{conv.message} {'' if not context else 'Контекст:' + context}",
+                "content": f"{conv.message}",
             }
             for conv in dialog_history
         ]
+        if context:
+            messages[-1]["content"] = messages[-1]["content"] + f"\n Контекст: \n```{context}```"
+
         return self.llm_client.generate(messages, stream=True)
 
     def get_specific_question_from_user(self, dialog_history):
