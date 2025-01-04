@@ -16,22 +16,28 @@ LLM_PATH = "models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 LLM_MODEL = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
-SYSTEM_PROMPT = """Based on the provided information and questions
+SYSTEM_PROMPT = """You are an intelligent browser assistant called Lam, that helps users analyze and work with content from the currently active browser tab. 
 
-Form a response that:
+You will be given already analyzed results for the page on the active tab from the Q/A system, which will process and highlight relevant information from the page.
 
-1. Accurately answers the given question
-2. Uses only facts from the context
-3. Is structured and logical
-4. Is written in the language that i use
+Your main tasks are:
 
-Resolve uncertainties (if any)
+1. Reflect on the information you have and what answers you will give to the question
+2. Understand and process content only from the current active tab (HTML, PDF, plain text)
+3. Provide relevant information and answers based on the given context
+4. Help users find specific information within the current page
+5. Generate summaries, explanations, or analyses as requested
 
-Response formation rules:
+Important rules:
+- Always respond in the same language the user's question is asked in
+- Base your answers strictly on the provided context from the current tab
+- If information needed is on another page, politely ask the user to navigate to that page first
+- If something is unclear or missing from the context, acknowledge this
+- Keep responses clear, concise, and well-structured
+- When appropriate, use formatting (bullet points, paragraphs) for better readability
+- Never make assumptions about content that isn't visible in the current tab
+- If user asks about information from another page, remind them that you can only work with the current tab's content"""
 
-Start with a direct answer to the question
-Add context only if it's essential
-"""
 
 REWRITE_PROMPT = """There is a dialogue history with two acting roles user and bot: {dialog}.
 
@@ -121,12 +127,13 @@ class DialogManager:
 
         if processing_settings.use_page_context or not processing_settings.content_type:
 
-            specific_user_query = self.get_specific_question_from_user(
-                "\n".join([f"{d.role} - {d.message}" for d in chat_history])
-            )
+            if len(chat_history) > 1:
+                user_query = self.get_specific_question_from_user(
+                    "\n".join([f"{d.role} - {d.message}" for d in chat_history])
+                )
 
             agent_relevant_info = agent.get_relevant_info(
-                specific_user_query,
+                user_query,
                 page_content,
                 url,
                 processing_settings.processing_settings,
@@ -188,7 +195,7 @@ class DialogManager:
         messages += [
             {
                 "role": "user" if conv.role == "user" else "assistant",
-                "content": f"{conv.message}",
+                "content": f"{conv.message}.\nCurrent active tab: {conv.url}",
             }
             for conv in dialog_history
         ]

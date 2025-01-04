@@ -23,9 +23,6 @@ Evaluate if there is sufficient information for a complete answer.
 Indicate where information may be incomplete or needs clarification.
 At the end, provide all relevant information.
 """
-#Your response will be in this format:
-#{response_format}
-#"""
 
 CHUNK_PROCESSING_PROMPT = """Your task is to answer this question ```{question}``` by finding everything relevant in a portion of a complex document obtained after processing a web page in a browser and passed to you in {format} format.
 Here is the document portion:
@@ -42,9 +39,6 @@ Evaluate if there is sufficient information for a complete answer.
 Indicate where information may be incomplete or needs clarification.
 At the end, provide all information and an overall assessment of the document's relevance to answering the question.
 """
-#Your response will be in this format:
-#{response_format}
-#"""
 
 CHUNK_AGREGATION_PROMPT = """Your task is to combine scattered responses from one document that was processed part by part, from top to bottom.
 Consequently, all responses from different parts are in the order they were processed.
@@ -57,9 +51,6 @@ Don't add anything on your own, use only information from the responses.
 Here are all the responses in the order they were processed:
 ```{documents}```
 """
-#Your response will be in this format:
-#{response_format}
-#"""
 
 
 class AnswerGeneratorWithRelevanceScore(BaseModel):
@@ -103,7 +94,6 @@ class HTMLAgent:
             processing_settings=processing_settings,
             context_len_checker=self.client.check_context_len,
         )
-        #print(document)
 
         if not self.client.check_context_len(text=document):
             documents = self.content_processor.process_page(
@@ -134,7 +124,6 @@ class HTMLAgent:
                             document=doc,
                             page_url=url,
                             additional_processing_markers=additional_processing_markers,
-                            #response_format=AnswerGeneratorWithRelevanceScore.model_json_schema(),
                         ),
                     },
                 ]
@@ -142,11 +131,10 @@ class HTMLAgent:
                 response = self.client.generate(
                     messages,
                     stream=False,
-                    #schema=AnswerGeneratorWithRelevanceScore.model_json_schema(),
                 )
                 print(response)
-                #print(doc)
                 relevant_chunks.append(response)
+
             print(relevant_chunks)
             messages = [
                 {
@@ -155,18 +143,15 @@ class HTMLAgent:
                         documents=self.content_processor.make_page(
                             documents, relevant_chunks, processing_settings
                         ),
-                        #response_format=AnswerGenerator.model_json_schema(),
                     ),
                 },
             ]
             response_from_model = self.client.generate(
                 messages,
                 stream=False,
-                #schema=AnswerGenerator.model_json_schema(),
             )
         else:
             print("\n\nSINGLE RUN\n\n")
-            #print(document)
 
             additional_processing_markers = """"""
 
@@ -181,14 +166,12 @@ class HTMLAgent:
                         document=document,
                         page_url=url,
                         additional_processing_markers=additional_processing_markers,
-                        #response_format=AnswerGenerator.model_json_schema(),
                     ),
                 },
             ]
             response_from_model = self.client.generate(
                 messages,
                 stream=False,
-                #schema=AnswerGenerator.model_json_schema(),
             )
         print("\n\n----------Response from model----------------\n\n")
         print(response_from_model)
