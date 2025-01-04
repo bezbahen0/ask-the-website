@@ -3,8 +3,11 @@ import uuid
 
 from server.agent import get_agent
 from server.constants import LLM_FOLDER_PATH
+
 from server.db import add_message, get_chat_messages
+
 from server.model import LlamaCppWrapper
+from server.model import JsonFieldStreamProcessor
 
 from pydantic import BaseModel
 
@@ -13,36 +16,38 @@ LLM_PATH = "models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 LLM_MODEL = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
 
 
-SYSTEM_PROMPT = """На основе предоставленной информации и вопросов
+SYSTEM_PROMPT = """Based on the provided information and questions
 
-Сформируй ответ, который:
-1. Точно отвечает на поставленный вопрос
-2. Использует только факты из контекста
-3. Структурирован и логичен
-4. Написан на языке который использует вопрос
+Form a response that:
 
-Решай неопределенности (если они есть)
+1. Accurately answers the given question
+2. Uses only facts from the context
+3. Is structured and logical
+4. Is written in the language that i use
 
-Правила формирования ответа:
-- Начни с прямого ответа на вопрос
-- Добавь контекст только если он существенен
+Resolve uncertainties (if any)
+
+Response formation rules:
+
+Start with a direct answer to the question
+Add context only if it's essential
 """
 
-REWRITE_PROMPT = """Есть история диалога с двумя действующими ролями user и bot: {dialog}.
+REWRITE_PROMPT = """There is a dialogue history with two acting roles user and bot: {dialog}.
 
-User видит страницу браузера по контексту которой отвечает bot.
+User sees a browser page about which bot responds.
 
-Твоя задача используя всю информацию из диалога выделить конкретизированный вопрос который есть у user в последнем его сообщении дополнив его всеми необходимыми терминами которые встречаются в диалоге для повышения полноты вопроса.
+Your task is to use all information from the dialogue to identify a specific question that the user has in their last message, supplementing it with all necessary terms that appear in the dialogue to increase the completeness of the question.
 
-Поразмышляй сначала над тем что происходит в диалоге и что надо делать.
+First reflect on what's happening in the dialogue and what needs to be done.
 
-Если диалог слишком маленький и не можешь сформулировать вопрос то оставь вопрос в исходном виде.
+If the dialogue is too short and you can't formulate a question, leave the question in its original form.
 
-Если не можешь перефразировать вопрос и он и так достаточно полный то оставь его в исходном виде.
+If you can't rephrase the question and it's already complete enough, leave it in its original form.
 
-Не ври, используй только то что есть в диалоге от себя ничегон не добавляй.
+Don't make things up, use only what's in the dialogue and don't add anything on your own.
 
-Формат твоего ответа будет в таком виде:
+Your response will be in this format:
 {response_format}
 """
 
@@ -50,6 +55,11 @@ User видит страницу браузера по контексту кот
 class RewriteQuestion(BaseModel):
     reflection: str
     specific_question: str
+
+
+class AnswerGenerator(BaseModel):
+    reflectoin: str
+    answer: str
 
 
 class DialogManager:
@@ -79,6 +89,7 @@ class DialogManager:
         self.repeat_penalty = repeat_penalty
 
         self.llm_client = self.get_llm_client()
+        self.answer_processor = JsonFieldStreamProcessor(field_name="answer")
 
     def add_chat_query(
         self,
@@ -99,7 +110,7 @@ class DialogManager:
             message=user_query,
             model_name="",
             service_comments=str(processing_settings.json()),
-            version="0.3.6.3",
+            version="0.3.6.4",
         )
 
         chat_history = get_chat_messages(chat_id=chat_id)
@@ -146,7 +157,7 @@ class DialogManager:
             message=complete_response,
             model_name=self.model_name,
             service_comments=str(params),
-            version="0.3.6.3",
+            version="0.3.6.4",
         )
 
     def from_chat_to_llm_tempalte(self, dialog_history):
@@ -177,11 +188,19 @@ class DialogManager:
         messages += [
             {
                 "role": "user" if conv.role == "user" else "assistant",
-                "content": f"{conv.message} {'' if not context else 'Контекст:' + context}",
+                "content": f"{conv.message}",
             }
             for conv in dialog_history
         ]
-        return self.llm_client.generate(messages, stream=True)
+        if context:
+            messages[-1]["content"] = messages[-1]["content"] + f"\n Context: \n```{context}```"
+
+        return self.llm_client.generate(
+            messages,
+            stream=True,
+            #stream_processor=self.answer_processor,
+            #schema=AnswerGenerator.model_json_schema(),
+        )
 
     def get_specific_question_from_user(self, dialog_history):
         response = self.llm_client.generate(
@@ -189,7 +208,7 @@ class DialogManager:
                 {
                     "role": "user",
                     "content": REWRITE_PROMPT.format(
-                        dialog="Начало диалога\n\n" + dialog_history,
+                        dialog="Start of dialogue\n\n" + dialog_history,
                         response_format=RewriteQuestion.model_json_schema(),
                     ),
                 }

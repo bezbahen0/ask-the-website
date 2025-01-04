@@ -6,59 +6,58 @@ from enum import Enum
 
 from server.partition import get_processor
 from server.partition.html_processor import HTMLProcessingSettings
-from server.model import JsonFieldStreamProcessor
 
 
-SYSTEM_PROMPT = """Твоя задача отвечая на этот вопрос ```{question}```, находить в сложном документе полученном после обработки web страницы в браузере и переданном тебе в {format} формате, всю что ты найдешь для ответа на этот вопрос.
-Вот документ:
+SYSTEM_PROMPT = """Your task is to answer this question ```{question}``` by finding everything relevant in a complex document obtained after processing a web page in a browser and passed to you in {format} format.
+Here is the document:
 ```{document}```
 
-Так же вот ссылка, {page_url}, по которой этот документ находится.
+Also, here is the link, {page_url}, where this document is located.
 
 {additional_processing_markers}
 
-Сначала поразмышляй над основной темой документа, ключевым разделам и их взаимосвязями.
-Найди в контексте информацию, напрямую отвечающую на вопрос.
-Определи связанную информацию, которая может дополнить ответ.
-Оцени достаточность информации для полного ответа.
-Укажи, где информация может быть неполной или требует уточнения.
-В конце выдай всю релевантную информацию.
+First, reflect on the main topic of the document, key sections and their relationships.
+Find information in the context that directly answers the question.
+Identify related information that may complement the answer.
+Evaluate if there is sufficient information for a complete answer.
+Indicate where information may be incomplete or needs clarification.
+At the end, provide all relevant information.
 
-Формат твоего ответа будет в таком виде:
+Your response will be in this format:
 {response_format}
 """
 
-CHUNK_PROCESSING_PROMPT = """Твоя задача отвечая на этот вопрос ```{question}```, находить в куске одного сложного документа полученном после обработки web страницы в браузере и переданном тебе в {format} формате, всю что ты найдешь для ответа на этот вопрос.
-Вот кусок документа:
+CHUNK_PROCESSING_PROMPT = """Your task is to answer this question ```{question}``` by finding everything relevant in a portion of a complex document obtained after processing a web page in a browser and passed to you in {format} format.
+Here is the document portion:
 ```{document}```
 
-Так же вот ссылка, {page_url}, по которой этот документ находится.
+Also, here is the link, {page_url}, where this document is located.
 
 {additional_processing_markers}
 
-Сначала поразмышляй над основной темой куска документа, ключевым разделам и их взаимосвязями.
-Найди в контексте информацию, напрямую отвечающую на вопрос.
-Определи связанную информацию, которая может дополнить ответ.
-Оцени достаточность информации для полного ответа.
-Укажи, где информация может быть неполной или требует уточнения.
-В конце выдай всю информацию и общую оценку релевантности документа для ответа на вопрос.
+First, reflect on the main topic of this document portion, key sections and their relationships.
+Find information in the context that directly answers the question.
+Identify related information that may complement the answer.
+Evaluate if there is sufficient information for a complete answer.
+Indicate where information may be incomplete or needs clarification.
+At the end, provide all information and an overall assessment of the document's relevance to answering the question.
 
-Формат твоего ответа будет в таком виде:
+Your response will be in this format:
 {response_format}
 """
 
-CHUNK_AGREGATION_PROMPT = """Твоя задача объединить разрозненный ответы одного документа, документ обрабатывался часть за частью, сверху в низ.
-Следовательно, все ответы по разным частям идут в порядке того как они обрабатывались. 
+CHUNK_AGREGATION_PROMPT = """Your task is to combine scattered responses from one document that was processed part by part, from top to bottom.
+Consequently, all responses from different parts are in the order they were processed.
 
-Поразмышляй над тем что у тебя на руках и что нужно сделать.
-Сформируй текст который бы объединил все эти ответы в один ответ.
+Reflect on what you have at hand and what needs to be done.
+Create a text that would combine all these responses into one comprehensive answer.
 
-Не добавляй от себя ничего, используй только информацию из ответов.
+Don't add anything on your own, use only information from the responses.
 
-Вот все ответы в порядке того как они обрабатывались:
+Here are all the responses in the order they were processed:
 ```{documents}```
 
-Формат твоего ответа будет в таком виде:
+Your response will be in this format:
 {response_format}
 """
 
@@ -87,7 +86,6 @@ class HTMLAgent:
         self.client = llm_client
 
         self.content_processor = get_processor()
-        self.answer_processor = JsonFieldStreamProcessor(field_name="answer")
 
     def get_relevant_info(self, question, context, url, processing_settings):
         processing_settings = HTMLProcessingSettings(**processing_settings)
