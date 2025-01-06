@@ -42,8 +42,10 @@ Important rules:
 REWRITE_PROMPT = """There is a dialogue history with two acting roles user and bot: {dialog}.
 
 User sees a browser page about which bot responds.
+Be careful, the dialogue may be about different sites (browser pages), keep track of which iteration on which page the question is asked.
 
 Your task is to use all information from the dialogue to identify a specific question that the user has in their last message, supplementing it with all necessary terms that appear in the dialogue to increase the completeness of the question.
+
 
 First reflect on what's happening in the dialogue and what needs to be done.
 
@@ -129,7 +131,7 @@ class DialogManager:
 
             if len(chat_history) > 1:
                 user_query = self.get_specific_question_from_user(
-                    "\n".join([f"{d.role} - {d.message}" for d in chat_history])
+                    "\n\n".join([f"Active browser tab: {d.url}\n {d.role}: ```{d.message}```" for d in chat_history])
                 )
 
             agent_relevant_info = agent.get_relevant_info(
@@ -223,6 +225,7 @@ class DialogManager:
             schema=RewriteQuestion.model_json_schema(),
             stream=False,
         )
+        print(dialog_history)
         print("\n\n REWRITED ------------------------------------\n\n")
         print(response)
         response = RewriteQuestion.model_validate_json(response)

@@ -33,6 +33,7 @@ Also, here is the link, {page_url}, where this document is located.
 {additional_processing_markers}
 
 First, reflect on the main topic of this document portion, key sections and their relationships.
+It is also important to indicate what layout of the web page this part can be.
 Find information in the context that directly answers the question.
 Identify related information that may complement the answer.
 Evaluate if there is sufficient information for a complete answer.
