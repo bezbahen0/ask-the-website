@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Local LLama LLM AI Chat Query Tool",
+  "name": "Ask the website",
   "version": "1.1.0",
   "description": "Query a local model from your browser.",
   "icons": {
@@ -10,7 +10,7 @@
   },
   "default_locale": "en",
   "action": {
-    "default_title": "Local LLama LLM AI Chat Query Tool"
+    "default_title": "Ask the website"
   },
   "side_panel": {
     "default_path": "side_panel/side_panel.html"

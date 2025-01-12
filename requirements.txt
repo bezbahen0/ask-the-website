@@ -1,6 +1,7 @@
 fastapi
 llama-cpp-python
 uvicorn
-langchain-text-splitters
-langchain_community
-langchain_chroma
+pydantic
+bs4
+html2text
+sqlalchemy
