@@ -9,6 +9,9 @@ Ask the Website is a Chrome extension that enables users to interact with a bot 
 
 The primary goal of this project is to enhance web browsing by providing an intelligent assistant that can analyze, explain, and answer questions about the content of any web page the user is viewing. Users can switch between tabs, asking questions about different pages, integrating this assistance into their regular browsing workflow.
 
+## Demo
+
+![Watch the demo video](./showcase.mp4)
 
 ## Key Features
 
